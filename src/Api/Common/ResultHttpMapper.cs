@@ -11,8 +11,10 @@ internal static class ResultHttpMapper
             "VALIDATION_ERROR" => StatusCodes.Status400BadRequest,
             "INVALID_STATE" => StatusCodes.Status400BadRequest,
             "UNAUTHORIZED" => StatusCodes.Status401Unauthorized,
+            "FORBIDDEN" => StatusCodes.Status403Forbidden,
             "NOT_FOUND" => StatusCodes.Status404NotFound,
             "CONFLICT" => StatusCodes.Status409Conflict,
+            "OSU_API_UNAVAILABLE" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
         };
 
