@@ -1,0 +1,24 @@
+# Build artifacts
+**/bin/
+**/obj/
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local tooling
+*.log
+
+# Local app settings overrides
+src/Api/appsettings.Local.json
+src/Worker/appsettings.Local.json
+
+# Local codex workspace files
+.codex/
