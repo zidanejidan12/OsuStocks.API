@@ -23,6 +23,34 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         return GetUserInternalAsync($"users/{osuUserId}", accessToken, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
+        string query,
+        string accessToken,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var boundedLimit = Math.Clamp(limit, 1, 50);
+        var searchResponse = await SendAsync<OsuSearchResponse>(
+            $"search?mode=user&query={Uri.EscapeDataString(query)}",
+            accessToken,
+            cancellationToken);
+
+        var users = searchResponse?.User?.Data ?? [];
+
+        return users
+            .Where(static user => user.Id > 0)
+            .Take(boundedLimit)
+            .Select(static user => new OsuUserProfile(
+                user.Id,
+                user.Username,
+                user.AvatarUrl,
+                user.Statistics?.Pp ?? 0m,
+                user.Statistics?.GlobalRank,
+                null,
+                null))
+            .ToList();
+    }
+
     private async Task<OsuUserProfile> GetUserInternalAsync(
         string path,
         string accessToken,
@@ -72,6 +100,18 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         }
 
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
+    }
+
+    private sealed class OsuSearchResponse
+    {
+        [JsonPropertyName("user")]
+        public OsuSearchUsersContainerResponse? User { get; init; }
+    }
+
+    private sealed class OsuSearchUsersContainerResponse
+    {
+        [JsonPropertyName("data")]
+        public List<OsuUserResponse> Data { get; init; } = [];
     }
 
     private sealed class OsuUserResponse

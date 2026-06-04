@@ -8,6 +8,12 @@ using OsuStocks.Application;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetOsuLoginUrl;
 using OsuStocks.Application.Features.OsuIntegration.Auth.HandleOsuCallback;
+using OsuStocks.Application.Features.PlayerRegistry.AddTrackedPlayer;
+using OsuStocks.Application.Features.PlayerRegistry.DisableTrackedPlayer;
+using OsuStocks.Application.Features.PlayerRegistry.EnableTrackedPlayer;
+using OsuStocks.Application.Features.PlayerRegistry.ListTrackedPlayers;
+using OsuStocks.Application.Features.PlayerRegistry.SearchOsuPlayers;
+using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
 using OsuStocks.Infrastructure.Authentication;
 using System.Security.Claims;
@@ -151,6 +157,111 @@ authGroup.MapGet("/me", async (
 })
 .RequireAuthorization();
 
+var adminGroup = app.MapGroup("/api/v1/admin")
+    .RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
+
+var trackedPlayersGroup = adminGroup.MapGroup("/tracked-players");
+
+trackedPlayersGroup.MapGet("", async (
+    bool? isActive,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new ListTrackedPlayersQuery(isActive), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { items = result.Value.Items });
+});
+
+trackedPlayersGroup.MapGet("/search", async (
+    string query,
+    int? limit,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new SearchOsuPlayersQuery(query, limit ?? 10), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { items = result.Value.Items });
+});
+
+trackedPlayersGroup.MapPost("", async (
+    AddTrackedPlayerRequest request,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var actor = ResolveActor(principal);
+    var result = await sender.Send(
+        new AddTrackedPlayerCommand(request.OsuUserId, request.TrackingTier, actor),
+        cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { trackedPlayerId = result.Value.TrackedPlayerId });
+});
+
+trackedPlayersGroup.MapPatch("/{id:guid}/enable", async (
+    Guid id,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var actor = ResolveActor(principal);
+    var result = await sender.Send(new EnableTrackedPlayerCommand(id, actor), cancellationToken);
+
+    if (!result.IsSuccess)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.NoContent();
+});
+
+trackedPlayersGroup.MapPatch("/{id:guid}/disable", async (
+    Guid id,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var actor = ResolveActor(principal);
+    var result = await sender.Send(new DisableTrackedPlayerCommand(id, actor), cancellationToken);
+
+    if (!result.IsSuccess)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.NoContent();
+});
+
 app.MapHangfireDashboard("/hangfire");
 
 app.Run();
+
+static string? ResolveActor(ClaimsPrincipal principal)
+{
+    return principal.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? principal.FindFirstValue(ClaimTypes.Name)
+        ?? principal.Identity?.Name;
+}
+
+public sealed record AddTrackedPlayerRequest(long OsuUserId, TrackingTier TrackingTier = TrackingTier.Tier3);
+
+public partial class Program
+{
+}

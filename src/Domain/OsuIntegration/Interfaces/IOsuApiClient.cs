@@ -7,4 +7,10 @@ public interface IOsuApiClient
     Task<OsuUserProfile> GetCurrentUserAsync(string accessToken, CancellationToken cancellationToken = default);
 
     Task<OsuUserProfile> GetUserAsync(long osuUserId, string accessToken, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
+        string query,
+        string accessToken,
+        int limit = 10,
+        CancellationToken cancellationToken = default);
 }
