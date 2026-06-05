@@ -52,7 +52,7 @@ public sealed class MarketEventProcessingService(
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken)
     {
-        var coefficients = coefficientsProvider.GetCurrent();
+        var coefficients = await coefficientsProvider.GetCurrentAsync(cancellationToken);
         var calculation = marketPriceEngine.Calculate(stock.CurrentPrice, input, coefficients);
         var reason = ResolveReason(input.Type);
 
@@ -90,3 +90,4 @@ public sealed class MarketEventProcessingService(
         };
     }
 }
+

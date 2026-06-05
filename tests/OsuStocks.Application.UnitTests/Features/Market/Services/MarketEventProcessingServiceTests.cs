@@ -105,7 +105,7 @@ public sealed class MarketEventProcessingServiceTests
 
     private sealed class StaticMarketCoefficientsProvider(MarketPricingCoefficients coefficients) : IMarketCoefficientsProvider
     {
-        public MarketPricingCoefficients GetCurrent() => coefficients;
+        public Task<MarketPricingCoefficients> GetCurrentAsync(CancellationToken cancellationToken = default) => Task.FromResult(coefficients);
     }
 
     private sealed class CountingDbContext : IApplicationDbContext
@@ -203,3 +203,4 @@ public sealed class MarketEventProcessingServiceTests
         }
     }
 }
+

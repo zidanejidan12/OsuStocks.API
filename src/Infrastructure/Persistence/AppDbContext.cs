@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Trade> Trades => Set<Trade>();
     public DbSet<PlayerSnapshot> PlayerSnapshots => Set<PlayerSnapshot>();
     public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
+    public DbSet<MarketSettings> MarketSettings => Set<MarketSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,3 +25,4 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 }
+

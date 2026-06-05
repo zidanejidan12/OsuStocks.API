@@ -77,6 +77,10 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
             services.AddSingleton<InMemoryMarketReadRepository>();
             services.AddSingleton<IMarketReadRepository>(provider => provider.GetRequiredService<InMemoryMarketReadRepository>());
 
+            services.RemoveAll<IMarketSettingsRepository>();
+            services.AddSingleton<InMemoryMarketSettingsRepository>();
+            services.AddSingleton<IMarketSettingsRepository>(provider => provider.GetRequiredService<InMemoryMarketSettingsRepository>());
+
             services.RemoveAll<IOsuTokenManager>();
             services.AddSingleton<InMemoryOsuTokenManager>();
             services.AddSingleton<IOsuTokenManager>(provider => provider.GetRequiredService<InMemoryOsuTokenManager>());
@@ -100,3 +104,5 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
         });
     }
 }
+
+

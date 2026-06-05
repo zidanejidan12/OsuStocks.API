@@ -4,5 +4,5 @@ namespace OsuStocks.Application.Common.Interfaces;
 
 public interface IMarketCoefficientsProvider
 {
-    MarketPricingCoefficients GetCurrent();
+    Task<MarketPricingCoefficients> GetCurrentAsync(CancellationToken cancellationToken = default);
 }
