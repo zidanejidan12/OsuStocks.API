@@ -1,3 +1,4 @@
+using Hangfire;
 using MediatR;
 using Microsoft.Extensions.Logging.Abstractions;
 using OsuStocks.Application.Common.Models;
@@ -11,15 +12,52 @@ namespace OsuStocks.Api.IntegrationTests;
 public sealed class SynchronizationRecurringJobIntegrationTests
 {
     [Fact]
-    public async Task RunTierAsync_SendsTierScopedSynchronizationCommand()
+    public async Task RunTier1Async_SendsTier1SynchronizationCommand()
     {
         var sender = new CapturingSender();
         var job = new OsuSynchronizationRecurringJob(sender, NullLogger<OsuSynchronizationRecurringJob>.Instance);
 
-        await job.RunTierAsync(TrackingTier.Tier2);
+        await job.RunTier1Async();
+
+        Assert.NotNull(sender.LastCommand);
+        Assert.Equal(TrackingTier.Tier1, sender.LastCommand!.Tier);
+    }
+
+    [Fact]
+    public async Task RunTier2Async_SendsTier2SynchronizationCommand()
+    {
+        var sender = new CapturingSender();
+        var job = new OsuSynchronizationRecurringJob(sender, NullLogger<OsuSynchronizationRecurringJob>.Instance);
+
+        await job.RunTier2Async();
 
         Assert.NotNull(sender.LastCommand);
         Assert.Equal(TrackingTier.Tier2, sender.LastCommand!.Tier);
+    }
+
+    [Fact]
+    public async Task RunTier3Async_SendsTier3SynchronizationCommand()
+    {
+        var sender = new CapturingSender();
+        var job = new OsuSynchronizationRecurringJob(sender, NullLogger<OsuSynchronizationRecurringJob>.Instance);
+
+        await job.RunTier3Async();
+
+        Assert.NotNull(sender.LastCommand);
+        Assert.Equal(TrackingTier.Tier3, sender.LastCommand!.Tier);
+    }
+
+    [Theory]
+    [InlineData(nameof(OsuSynchronizationRecurringJob.RunTier1Async))]
+    [InlineData(nameof(OsuSynchronizationRecurringJob.RunTier2Async))]
+    [InlineData(nameof(OsuSynchronizationRecurringJob.RunTier3Async))]
+    public void SyncRecurringJobs_AreProtectedWithDisableConcurrentExecution(string methodName)
+    {
+        var method = typeof(OsuSynchronizationRecurringJob).GetMethod(methodName);
+
+        Assert.NotNull(method);
+        var attributes = method!.GetCustomAttributes(typeof(DisableConcurrentExecutionAttribute), inherit: true);
+        Assert.NotEmpty(attributes);
     }
 
     private sealed class CapturingSender : ISender

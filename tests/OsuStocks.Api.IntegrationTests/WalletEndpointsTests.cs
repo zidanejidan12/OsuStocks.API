@@ -1,34 +1,42 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OsuStocks.Api.IntegrationTests.Infrastructure;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
+using OsuStocks.Infrastructure.Persistence;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Xunit;
 
 namespace OsuStocks.Api.IntegrationTests;
 
-public sealed class WalletEndpointsTests
+[Collection(PostgresCollection.Name)]
+public sealed class WalletEndpointsTests(PostgresTestcontainerFixture fixture)
 {
     private static readonly Guid TestUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     [Fact]
     public async Task GetWallet_ReturnsCurrentBalance()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new PostgresWebApplicationFactory(fixture);
         using var client = factory.CreateClient();
 
-        using var scope = factory.Services.CreateScope();
-        var walletRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletRepository>();
-
-        await walletRepository.AddAsync(new Wallet
+        using (var scope = factory.Services.CreateScope())
         {
-            Id = Guid.NewGuid(),
-            UserId = TestUserId,
-            Balance = 12345.67m,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        });
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            dbContext.Users.Add(CreateUser(TestUserId, 501001));
+            dbContext.Wallets.Add(new Wallet
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                Balance = 12345.67m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            });
+
+            await dbContext.SaveChangesAsync();
+        }
 
         var response = await client.GetAsync("/api/v1/wallet");
         response.EnsureSuccessStatusCode();
@@ -41,43 +49,52 @@ public sealed class WalletEndpointsTests
     [Fact]
     public async Task GetWalletTransactions_ReturnsPagedLedgerItems()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new PostgresWebApplicationFactory(fixture);
         using var client = factory.CreateClient();
 
-        using var scope = factory.Services.CreateScope();
-        var walletRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletRepository>();
-        var walletTransactionRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletTransactionRepository>();
+        Guid walletId;
 
-        var wallet = new Wallet
+        using (var scope = factory.Services.CreateScope())
         {
-            Id = Guid.NewGuid(),
-            UserId = TestUserId,
-            Balance = 1000m,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        };
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await walletRepository.AddAsync(wallet);
+            dbContext.Users.Add(CreateUser(TestUserId, 501002));
 
-        await walletTransactionRepository.AddAsync(new WalletTransaction
-        {
-            Id = Guid.NewGuid(),
-            WalletId = wallet.Id,
-            TransactionType = WalletTransactionType.BuyStock,
-            Amount = 100m,
-            ReferenceId = Guid.NewGuid(),
-            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2)
-        });
+            var wallet = new Wallet
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                Balance = 1000m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
 
-        await walletTransactionRepository.AddAsync(new WalletTransaction
-        {
-            Id = Guid.NewGuid(),
-            WalletId = wallet.Id,
-            TransactionType = WalletTransactionType.SellStock,
-            Amount = 150m,
-            ReferenceId = Guid.NewGuid(),
-            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
-        });
+            walletId = wallet.Id;
+
+            dbContext.Wallets.Add(wallet);
+
+            dbContext.WalletTransactions.Add(new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = wallet.Id,
+                TransactionType = WalletTransactionType.BuyStock,
+                Amount = 100m,
+                ReferenceId = Guid.NewGuid(),
+                CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2)
+            });
+
+            dbContext.WalletTransactions.Add(new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = wallet.Id,
+                TransactionType = WalletTransactionType.SellStock,
+                Amount = 150m,
+                ReferenceId = Guid.NewGuid(),
+                CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            });
+
+            await dbContext.SaveChangesAsync();
+        }
 
         var response = await client.GetAsync("/api/v1/wallet/transactions?page=1&pageSize=10");
         response.EnsureSuccessStatusCode();
@@ -87,6 +104,24 @@ public sealed class WalletEndpointsTests
         Assert.Equal(2, payload.Items.Count);
         Assert.Equal("SellStock", payload.Items[0].TransactionType);
         Assert.Equal("BuyStock", payload.Items[1].TransactionType);
+
+        using var assertionScope = factory.Services.CreateScope();
+        var assertionContext = assertionScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedCount = await assertionContext.WalletTransactions.CountAsync(x => x.WalletId == walletId);
+        Assert.Equal(2, persistedCount);
+    }
+
+    private static User CreateUser(Guid userId, long osuUserId)
+    {
+        return new User
+        {
+            Id = userId,
+            OsuUserId = osuUserId,
+            Username = $"user-{osuUserId}",
+            Role = UserRole.User,
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "seed"
+        };
     }
 
     private sealed record WalletSummaryResponse([property: JsonPropertyName("balance")] decimal Balance);

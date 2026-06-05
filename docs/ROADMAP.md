@@ -69,6 +69,25 @@ Playable MVP
 
 ---
 
+# Phase 1.5 - Post-MVP Deferred Features
+
+Priority:
+High
+
+Status:
+Postponed
+
+Features:
+
+* Leaderboards (richest, investors, stocks)
+* Market maintenance mode
+
+Exit Criteria:
+
+Deferred features are implemented and released after MVP stabilization.
+
+---
+
 # Phase 2 - Market Intelligence
 
 Priority:
@@ -193,8 +212,8 @@ System scales without architectural redesign.
 5. Trading
 6. Portfolio
 7. Market Engine
-8. Leaderboards
-9. Admin Panel
+8. Admin Panel
+9. Leaderboards (Phase 1.5)
 10. Analytics
 
 ---
@@ -227,11 +246,11 @@ Top play changes stock price.
 
 Milestone 7
 
-Leaderboard operational.
+Public MVP release.
 
 Milestone 8
 
-Public MVP release.
+Leaderboards and maintenance mode released (Phase 1.5).
 
 ---
 
@@ -253,3 +272,4 @@ Business:
 Primary Goal:
 
 Deliver a stable, fun, and maintainable fantasy trading experience around the osu! ecosystem.
+

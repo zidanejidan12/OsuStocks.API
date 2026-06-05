@@ -1,12 +1,15 @@
+using OsuStocks.Domain.Common.Interfaces;
+
 namespace OsuStocks.Domain.Entities;
 
-public sealed class PlayerStock
+public sealed class PlayerStock : IHasRowVersion
 {
     public Guid Id { get; set; }
     public Guid TrackedPlayerId { get; set; }
     public decimal CurrentPrice { get; set; }
     public decimal DemandScore { get; set; }
     public decimal PerformanceScore { get; set; }
+    public long RowVersion { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public DateTimeOffset LastUpdated { get; set; }

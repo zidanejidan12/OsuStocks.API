@@ -52,8 +52,10 @@ public static class DependencyInjection
         services.AddScoped<IPlayerStockRepository, PlayerStockRepository>();
         services.AddScoped<IStockPriceHistoryRepository, StockPriceHistoryRepository>();
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();
+        services.AddScoped<IPortfolioReadRepository, PortfolioReadRepository>();
         services.AddScoped<IHoldingRepository, HoldingRepository>();
         services.AddScoped<ITradeRepository, TradeRepository>();
+        services.AddScoped<ITradeReadRepository, TradeReadRepository>();
         services.AddScoped<IPlayerSnapshotRepository, PlayerSnapshotRepository>();
         services.AddScoped<IMarketEventRepository, MarketEventRepository>();
         services.AddScoped<IMarketReadRepository, MarketReadRepository>();
@@ -108,9 +110,3 @@ public static class DependencyInjection
         return services;
     }
 }
-
-
-
-
-
-

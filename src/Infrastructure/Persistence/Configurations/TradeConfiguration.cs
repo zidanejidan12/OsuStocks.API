@@ -20,9 +20,10 @@ internal sealed class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.Property(x => x.TotalAmount).HasColumnName("total_amount").HasPrecision(18, 2).IsRequired();
         builder.Property(x => x.ExecutedAt).HasColumnName("executed_at").IsRequired();
 
-        builder.HasIndex(x => x.UserId).HasDatabaseName("ix_trade_user");
         builder.HasIndex(x => x.StockId).HasDatabaseName("ix_trade_stock");
-        builder.HasIndex(x => x.ExecutedAt).HasDatabaseName("ix_trade_executed");
+        builder.HasIndex(x => new { x.UserId, x.ExecutedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_trade_user_executed_desc");
 
         builder.HasOne(x => x.User)
             .WithMany(x => x.Trades)

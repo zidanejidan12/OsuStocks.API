@@ -16,6 +16,11 @@ internal sealed class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         builder.Property(x => x.StockId).HasColumnName("stock_id").IsRequired();
         builder.Property(x => x.Quantity).HasColumnName("quantity").IsRequired();
         builder.Property(x => x.AveragePrice).HasColumnName("average_price").HasPrecision(18, 2).IsRequired();
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1L)
+            .IsConcurrencyToken()
+            .IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");

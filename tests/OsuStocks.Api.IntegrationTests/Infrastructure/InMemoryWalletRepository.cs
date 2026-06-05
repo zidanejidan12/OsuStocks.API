@@ -73,6 +73,7 @@ internal sealed class InMemoryWalletRepository : IWalletRepository
             Id = wallet.Id,
             UserId = wallet.UserId,
             Balance = wallet.Balance,
+            RowVersion = wallet.RowVersion,
             CreatedAt = wallet.CreatedAt,
             CreatedBy = wallet.CreatedBy,
             UpdatedAt = wallet.UpdatedAt,

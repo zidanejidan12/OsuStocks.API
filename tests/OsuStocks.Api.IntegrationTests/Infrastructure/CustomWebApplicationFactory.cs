@@ -73,6 +73,14 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
             services.AddSingleton<InMemoryTradeRepository>();
             services.AddSingleton<ITradeRepository>(provider => provider.GetRequiredService<InMemoryTradeRepository>());
 
+            services.RemoveAll<IPortfolioReadRepository>();
+            services.AddSingleton<InMemoryPortfolioReadRepository>();
+            services.AddSingleton<IPortfolioReadRepository>(provider => provider.GetRequiredService<InMemoryPortfolioReadRepository>());
+
+            services.RemoveAll<ITradeReadRepository>();
+            services.AddSingleton<InMemoryTradeReadRepository>();
+            services.AddSingleton<ITradeReadRepository>(provider => provider.GetRequiredService<InMemoryTradeReadRepository>());
+
             services.RemoveAll<IMarketReadRepository>();
             services.AddSingleton<InMemoryMarketReadRepository>();
             services.AddSingleton<IMarketReadRepository>(provider => provider.GetRequiredService<InMemoryMarketReadRepository>());
@@ -107,7 +115,3 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
         });
     }
 }
-
-
-
-

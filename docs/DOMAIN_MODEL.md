@@ -264,4 +264,8 @@ RewardGranted
 
 PlayerDelisted
 
+
+Postponed Domain Event (Phase 1.5)
+
 MarketMaintenanceEnabled
+

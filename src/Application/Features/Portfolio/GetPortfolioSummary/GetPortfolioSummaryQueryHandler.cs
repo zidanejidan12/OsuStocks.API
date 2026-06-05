@@ -4,58 +4,31 @@ using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Application.Features.Portfolio.GetPortfolioSummary;
 
-public sealed class GetPortfolioSummaryQueryHandler(
-    IPortfolioRepository portfolioRepository,
-    IHoldingRepository holdingRepository,
-    IPlayerStockRepository playerStockRepository,
-    ITrackedPlayerRepository trackedPlayerRepository)
+public sealed class GetPortfolioSummaryQueryHandler(IPortfolioReadRepository portfolioReadRepository)
     : IRequestHandler<GetPortfolioSummaryQuery, Result<GetPortfolioSummaryResponse>>
 {
     public async Task<Result<GetPortfolioSummaryResponse>> Handle(
         GetPortfolioSummaryQuery request,
         CancellationToken cancellationToken)
     {
-        var portfolio = await portfolioRepository.GetByUserIdAsync(request.UserId, cancellationToken);
-        if (portfolio is null)
-        {
-            return Result.Success(new GetPortfolioSummaryResponse(0m, 0m, 0m, []));
-        }
+        var holdings = await portfolioReadRepository
+            .GetPortfolioSummaryHoldingsByUserIdAsync(request.UserId, cancellationToken);
 
-        var holdings = await holdingRepository.GetByPortfolioIdAsync(portfolio.Id, cancellationToken);
-        var items = new List<PortfolioHoldingSummaryItem>(holdings.Count);
+        var items = holdings
+            .Select(x => new PortfolioHoldingSummaryItem(
+                x.HoldingId,
+                x.StockId,
+                x.PlayerName,
+                x.Quantity,
+                x.AveragePrice,
+                x.CurrentPrice,
+                x.CostBasis,
+                x.CurrentValue,
+                x.ProfitLoss))
+            .ToList();
 
-        decimal totalCurrentValue = 0m;
-        decimal totalCostBasis = 0m;
-
-        foreach (var holding in holdings)
-        {
-            var stock = await playerStockRepository.GetByIdAsync(holding.StockId, cancellationToken);
-            var currentPrice = stock?.CurrentPrice ?? 0m;
-            var currentValue = currentPrice * holding.Quantity;
-            var costBasis = holding.AveragePrice * holding.Quantity;
-            var profitLoss = currentValue - costBasis;
-
-            string? playerName = null;
-            if (stock is not null)
-            {
-                var trackedPlayer = await trackedPlayerRepository.GetByIdAsync(stock.TrackedPlayerId, cancellationToken);
-                playerName = trackedPlayer?.Username;
-            }
-
-            totalCurrentValue += currentValue;
-            totalCostBasis += costBasis;
-
-            items.Add(new PortfolioHoldingSummaryItem(
-                holding.Id,
-                holding.StockId,
-                playerName,
-                holding.Quantity,
-                holding.AveragePrice,
-                currentPrice,
-                costBasis,
-                currentValue,
-                profitLoss));
-        }
+        var totalCurrentValue = holdings.Sum(x => x.CurrentValue);
+        var totalCostBasis = holdings.Sum(x => x.CostBasis);
 
         return Result.Success(new GetPortfolioSummaryResponse(
             totalCurrentValue,

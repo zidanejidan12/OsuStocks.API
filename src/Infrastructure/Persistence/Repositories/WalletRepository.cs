@@ -33,6 +33,14 @@ internal sealed class WalletRepository(AppDbContext dbContext) : IWalletReposito
 
     public void Update(Wallet wallet)
     {
-        dbContext.Wallets.Update(wallet);
+        var entry = dbContext.Entry(wallet);
+        if (entry.State == EntityState.Detached)
+        {
+            dbContext.Wallets.Attach(wallet);
+            entry = dbContext.Entry(wallet);
+        }
+
+        entry.State = EntityState.Modified;
+        entry.Property(x => x.RowVersion).OriginalValue = wallet.RowVersion;
     }
 }

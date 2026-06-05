@@ -39,11 +39,27 @@ internal sealed class HoldingRepository(AppDbContext dbContext) : IHoldingReposi
 
     public void Update(Holding holding)
     {
-        dbContext.Holdings.Update(holding);
+        var entry = dbContext.Entry(holding);
+        if (entry.State == EntityState.Detached)
+        {
+            dbContext.Holdings.Attach(holding);
+            entry = dbContext.Entry(holding);
+        }
+
+        entry.State = EntityState.Modified;
+        entry.Property(x => x.RowVersion).OriginalValue = holding.RowVersion;
     }
 
     public void Remove(Holding holding)
     {
+        var entry = dbContext.Entry(holding);
+        if (entry.State == EntityState.Detached)
+        {
+            dbContext.Holdings.Attach(holding);
+            entry = dbContext.Entry(holding);
+        }
+
+        entry.Property(x => x.RowVersion).OriginalValue = holding.RowVersion;
         dbContext.Holdings.Remove(holding);
     }
 }

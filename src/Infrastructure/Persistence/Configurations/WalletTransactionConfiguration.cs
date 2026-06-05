@@ -18,7 +18,8 @@ internal sealed class WalletTransactionConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.ReferenceId).HasColumnName("reference_id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
-        builder.HasIndex(x => x.WalletId).HasDatabaseName("ix_wallet_transactions_wallet_id");
-        builder.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_wallet_transactions_created_at");
+        builder.HasIndex(x => new { x.WalletId, x.CreatedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_wallet_transactions_wallet_created_desc");
     }
 }
