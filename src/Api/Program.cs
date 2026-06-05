@@ -13,6 +13,10 @@ using OsuStocks.Application.Features.PlayerRegistry.DisableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.EnableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.ListTrackedPlayers;
 using OsuStocks.Application.Features.PlayerRegistry.SearchOsuPlayers;
+using OsuStocks.Application.Features.Market.GetMarketOverview;
+using OsuStocks.Application.Features.Market.GetMarketStocks;
+using OsuStocks.Application.Features.Market.GetMarketStockDetails;
+using OsuStocks.Application.Features.Market.GetMarketStockHistory;
 using OsuStocks.Application.Features.Trading.BuyStock;
 using OsuStocks.Application.Features.Trading.GetHoldings;
 using OsuStocks.Application.Features.Trading.GetTradeHistory;
@@ -163,6 +167,114 @@ authGroup.MapGet("/me", async (
 })
 .RequireAuthorization();
 
+var marketGroup = app.MapGroup("/api/v1/market")
+    .RequireAuthorization();
+
+marketGroup.MapGet("", async (
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new GetMarketOverviewQuery(), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    Dictionary<string, object?> ToMoverObject(OsuStocks.Application.Features.Market.GetMarketOverview.MarketTopMoverResponse? mover)
+    {
+        if (mover is null)
+        {
+            return new Dictionary<string, object?>();
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["stockId"] = mover.StockId,
+            ["playerName"] = mover.PlayerName,
+            ["currentPrice"] = mover.CurrentPrice,
+            ["priceChange24h"] = mover.PriceChange24h
+        };
+    }
+
+    return Results.Ok(new
+    {
+        totalStocks = result.Value.TotalStocks,
+        totalVolume = result.Value.TotalVolume,
+        topGainer = ToMoverObject(result.Value.TopGainer),
+        topLoser = ToMoverObject(result.Value.TopLoser)
+    });
+});
+
+marketGroup.MapGet("/stocks", async (
+    int? page,
+    int? pageSize,
+    string? sort,
+    string? search,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new GetMarketStocksQuery(
+        page ?? 1,
+        pageSize ?? 25,
+        sort,
+        search), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items,
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize,
+        totalCount = result.Value.TotalCount
+    });
+});
+
+marketGroup.MapGet("/stocks/{stockId:guid}", async (
+    Guid stockId,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new GetMarketStockDetailsQuery(stockId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        stockId = result.Value.StockId,
+        playerName = result.Value.PlayerName,
+        currentPrice = result.Value.CurrentPrice,
+        volume = result.Value.Volume,
+        priceChange24h = result.Value.PriceChange24h
+    });
+});
+
+marketGroup.MapGet("/stocks/{stockId:guid}/history", async (
+    Guid stockId,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new GetMarketStockHistoryQuery(stockId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(result.Value.Items.Select(x => new
+    {
+        timestamp = x.Timestamp,
+        price = x.Price
+    }));
+});
 var tradingGroup = app.MapGroup("/api/v1/trading")
     .RequireAuthorization();
 
@@ -460,6 +572,11 @@ public sealed record TradeStockRequest(Guid StockId, int Quantity);
 public partial class Program
 {
 }
+
+
+
+
+
 
 
 

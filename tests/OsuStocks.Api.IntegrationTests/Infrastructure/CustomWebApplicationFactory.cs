@@ -73,6 +73,10 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
             services.AddSingleton<InMemoryTradeRepository>();
             services.AddSingleton<ITradeRepository>(provider => provider.GetRequiredService<InMemoryTradeRepository>());
 
+            services.RemoveAll<IMarketReadRepository>();
+            services.AddSingleton<InMemoryMarketReadRepository>();
+            services.AddSingleton<IMarketReadRepository>(provider => provider.GetRequiredService<InMemoryMarketReadRepository>());
+
             services.RemoveAll<IOsuTokenManager>();
             services.AddSingleton<InMemoryOsuTokenManager>();
             services.AddSingleton<IOsuTokenManager>(provider => provider.GetRequiredService<InMemoryOsuTokenManager>());
