@@ -17,6 +17,8 @@ using OsuStocks.Application.Features.Trading.BuyStock;
 using OsuStocks.Application.Features.Trading.GetHoldings;
 using OsuStocks.Application.Features.Trading.GetTradeHistory;
 using OsuStocks.Application.Features.Portfolio.GetPortfolioSummary;
+using OsuStocks.Application.Features.Wallet.GetWallet;
+using OsuStocks.Application.Features.Wallet.GetWalletTransactions;
 using OsuStocks.Application.Features.Trading.SellStock;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
@@ -289,6 +291,50 @@ portfolioGroup.MapGet("/holdings", async (
     return Results.Ok(new { items = result.Value.Items });
 });
 
+var walletGroup = app.MapGroup("/api/v1/wallet")
+    .RequireAuthorization();
+
+walletGroup.MapGet("", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetWalletQuery(userId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { balance = result.Value.Balance });
+});
+
+walletGroup.MapGet("/transactions", async (
+    int? page,
+    int? pageSize,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetWalletTransactionsQuery(userId, page ?? 1, pageSize ?? 25), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { items = result.Value.Items });
+});
 var adminGroup = app.MapGroup("/api/v1/admin")
     .RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
 
@@ -414,6 +460,9 @@ public sealed record TradeStockRequest(Guid StockId, int Quantity);
 public partial class Program
 {
 }
+
+
+
 
 
 

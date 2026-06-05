@@ -1,4 +1,5 @@
 using OsuStocks.Domain.Entities;
+using OsuStocks.Domain.Models;
 using OsuStocks.Domain.Repositories;
 using System.Collections.Concurrent;
 
@@ -32,6 +33,28 @@ internal sealed class InMemoryWalletTransactionRepository : IWalletTransactionRe
             .ToList();
 
         return Task.FromResult<IReadOnlyList<WalletTransaction>>(items);
+    }
+
+    public Task<IReadOnlyList<WalletTransactionReadModel>> GetProjectedByWalletIdAsync(
+        Guid walletId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var items = _transactionsById.Values
+            .Where(x => x.WalletId == walletId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip(Math.Max(skip, 0))
+            .Take(Math.Max(take, 0))
+            .Select(x => new WalletTransactionReadModel(
+                x.Id,
+                x.TransactionType.ToString(),
+                x.Amount,
+                x.ReferenceId,
+                x.CreatedAt))
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<WalletTransactionReadModel>>(items);
     }
 
     private static WalletTransaction? Clone(WalletTransaction? transaction)

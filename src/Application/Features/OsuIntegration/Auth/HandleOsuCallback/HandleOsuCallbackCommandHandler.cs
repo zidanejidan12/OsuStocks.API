@@ -54,7 +54,7 @@ public sealed class HandleOsuCallbackCommandHandler(
 
                 await userRepository.AddAsync(user, cancellationToken);
 
-                var wallet = new Wallet
+                var wallet = new OsuStocks.Domain.Entities.Wallet
                 {
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
@@ -64,7 +64,7 @@ public sealed class HandleOsuCallbackCommandHandler(
                 };
                 await walletRepository.AddAsync(wallet, cancellationToken);
 
-                var initialGrant = new WalletTransaction
+                var initialGrant = new OsuStocks.Domain.Entities.WalletTransaction
                 {
                     Id = Guid.NewGuid(),
                     WalletId = wallet.Id,
@@ -110,4 +110,5 @@ public sealed class HandleOsuCallbackCommandHandler(
         }
     }
 }
+
 
