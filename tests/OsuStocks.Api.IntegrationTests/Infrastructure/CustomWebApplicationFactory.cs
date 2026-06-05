@@ -42,15 +42,36 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<ITrackedPlayerRepository>();
-            services.AddSingleton<ITrackedPlayerRepository, InMemoryTrackedPlayerRepository>();
+            services.AddSingleton<InMemoryTrackedPlayerRepository>();
+            services.AddSingleton<ITrackedPlayerRepository>(provider => provider.GetRequiredService<InMemoryTrackedPlayerRepository>());
+
+            services.RemoveAll<IUserRepository>();
+            services.AddSingleton<InMemoryUserRepository>();
+            services.AddSingleton<IUserRepository>(provider => provider.GetRequiredService<InMemoryUserRepository>());
+
+            services.RemoveAll<IWalletRepository>();
+            services.AddSingleton<InMemoryWalletRepository>();
+            services.AddSingleton<IWalletRepository>(provider => provider.GetRequiredService<InMemoryWalletRepository>());
+
+            services.RemoveAll<IWalletTransactionRepository>();
+            services.AddSingleton<InMemoryWalletTransactionRepository>();
+            services.AddSingleton<IWalletTransactionRepository>(provider => provider.GetRequiredService<InMemoryWalletTransactionRepository>());
+
+            services.RemoveAll<IPortfolioRepository>();
+            services.AddSingleton<InMemoryPortfolioRepository>();
+            services.AddSingleton<IPortfolioRepository>(provider => provider.GetRequiredService<InMemoryPortfolioRepository>());
+
+            services.RemoveAll<IOsuTokenManager>();
+            services.AddSingleton<InMemoryOsuTokenManager>();
+            services.AddSingleton<IOsuTokenManager>(provider => provider.GetRequiredService<InMemoryOsuTokenManager>());
 
             services.RemoveAll<IApplicationDbContext>();
             services.AddScoped<IApplicationDbContext, NoOpApplicationDbContext>();
 
             services.RemoveAll<IOsuOAuthService>();
             services.RemoveAll<IOsuApiClient>();
-            services.AddScoped<IOsuOAuthService, FakeOsuOAuthService>();
-            services.AddScoped<IOsuApiClient, FakeOsuApiClient>();
+            services.AddSingleton<IOsuOAuthService, FakeOsuOAuthService>();
+            services.AddSingleton<IOsuApiClient, FakeOsuApiClient>();
 
             services.AddAuthentication(options =>
             {
