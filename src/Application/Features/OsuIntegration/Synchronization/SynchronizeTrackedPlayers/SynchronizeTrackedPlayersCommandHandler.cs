@@ -13,11 +13,12 @@ public sealed class SynchronizeTrackedPlayersCommandHandler(IPlayerSynchronizati
     {
         try
         {
-            var summary = await playerSynchronizationService.SynchronizeTrackedPlayersAsync(cancellationToken);
+            var summary = await playerSynchronizationService.SynchronizeTrackedPlayersAsync(request.Tier, cancellationToken);
             return Result.Success(new SynchronizeTrackedPlayersResponse(
                 summary.TrackedPlayers,
                 summary.SnapshotsCreated,
-                summary.EventsDetected));
+                summary.EventsDetected,
+                summary.RankImprovementsDetected));
         }
         catch (HttpRequestException)
         {

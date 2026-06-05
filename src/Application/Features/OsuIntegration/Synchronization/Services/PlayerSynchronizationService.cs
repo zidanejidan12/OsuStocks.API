@@ -1,4 +1,5 @@
 using OsuStocks.Application.Common.Interfaces;
+using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Models;
@@ -19,21 +20,28 @@ public sealed class PlayerSynchronizationService(
     : IPlayerSynchronizationService
 {
     public async Task<PlayerSynchronizationSummary> SynchronizeTrackedPlayersAsync(
+        TrackingTier? tier = null,
         CancellationToken cancellationToken = default)
     {
-        var trackedPlayers = await trackedPlayerRepository.GetActiveAsync(cancellationToken);
+        var trackedPlayers = tier.HasValue
+            ? await trackedPlayerRepository.GetActiveByTierAsync(tier.Value, cancellationToken)
+            : await trackedPlayerRepository.GetActiveAsync(cancellationToken);
+
         if (trackedPlayers.Count == 0)
         {
-            return new PlayerSynchronizationSummary(0, 0, 0);
+            return new PlayerSynchronizationSummary(0, 0, 0, 0);
         }
 
         var osuToken = await osuOAuthService.GetClientCredentialsTokenAsync(cancellationToken);
 
         var snapshotsCreated = 0;
         var eventsDetected = 0;
+        var rankImprovementsDetected = 0;
 
         foreach (var trackedPlayer in trackedPlayers)
         {
+            var now = DateTimeOffset.UtcNow;
+
             var latestProfile = await osuApiClient.GetUserAsync(
                 trackedPlayer.OsuUserId,
                 osuToken.AccessToken,
@@ -46,7 +54,7 @@ public sealed class PlayerSynchronizationService(
                 previousSnapshot,
                 latestProfile,
                 trackedPlayer.Id,
-                DateTimeOffset.UtcNow);
+                now);
 
             var newSnapshot = new PlayerSnapshot
             {
@@ -56,11 +64,16 @@ public sealed class PlayerSynchronizationService(
                 GlobalRank = latestProfile.GlobalRank,
                 TopScoreId = latestProfile.TopScoreId,
                 TopScorePp = latestProfile.TopScorePp,
-                CapturedAt = DateTimeOffset.UtcNow
+                CapturedAt = now
             };
 
             await playerSnapshotRepository.AddAsync(newSnapshot, cancellationToken);
             snapshotsCreated++;
+
+            if (comparison.IsRankImproved)
+            {
+                rankImprovementsDetected++;
+            }
 
             if (comparison.Events.Count > 0)
             {
@@ -77,7 +90,7 @@ public sealed class PlayerSynchronizationService(
                             StockId = playerStock.Id,
                             EventType = domainEvent.EventType,
                             Payload = JsonSerializer.Serialize(domainEvent),
-                            CreatedAt = DateTimeOffset.UtcNow
+                            CreatedAt = now
                         };
 
                         await marketEventRepository.AddAsync(marketEvent, cancellationToken);
@@ -93,6 +106,7 @@ public sealed class PlayerSynchronizationService(
         return new PlayerSynchronizationSummary(
             trackedPlayers.Count,
             snapshotsCreated,
-            eventsDetected);
+            eventsDetected,
+            rankImprovementsDetected);
     }
 }

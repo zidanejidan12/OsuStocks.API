@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Repositories;
 
@@ -55,6 +56,17 @@ internal sealed class TrackedPlayerRepository(AppDbContext dbContext) : ITracked
             .Where(x => x.IsActive)
             .OrderBy(x => x.TrackingTier)
             .ThenBy(x => x.Username)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TrackedPlayer>> GetActiveByTierAsync(
+        TrackingTier tier,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.TrackedPlayers
+            .AsNoTracking()
+            .Where(x => x.IsActive && x.TrackingTier == tier)
+            .OrderBy(x => x.Username)
             .ToListAsync(cancellationToken);
     }
 

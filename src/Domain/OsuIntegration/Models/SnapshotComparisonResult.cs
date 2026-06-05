@@ -4,4 +4,5 @@ namespace OsuStocks.Domain.OsuIntegration.Models;
 
 public sealed record SnapshotComparisonResult(
     IReadOnlyCollection<OsuDomainEvent> Events,
-    bool IsInactive);
+    bool IsInactive,
+    bool IsRankImproved);
