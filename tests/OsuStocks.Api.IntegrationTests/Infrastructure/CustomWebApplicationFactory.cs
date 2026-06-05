@@ -61,6 +61,18 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
             services.AddSingleton<InMemoryPortfolioRepository>();
             services.AddSingleton<IPortfolioRepository>(provider => provider.GetRequiredService<InMemoryPortfolioRepository>());
 
+            services.RemoveAll<IPlayerStockRepository>();
+            services.AddSingleton<InMemoryPlayerStockRepository>();
+            services.AddSingleton<IPlayerStockRepository>(provider => provider.GetRequiredService<InMemoryPlayerStockRepository>());
+
+            services.RemoveAll<IHoldingRepository>();
+            services.AddSingleton<InMemoryHoldingRepository>();
+            services.AddSingleton<IHoldingRepository>(provider => provider.GetRequiredService<InMemoryHoldingRepository>());
+
+            services.RemoveAll<ITradeRepository>();
+            services.AddSingleton<InMemoryTradeRepository>();
+            services.AddSingleton<ITradeRepository>(provider => provider.GetRequiredService<InMemoryTradeRepository>());
+
             services.RemoveAll<IOsuTokenManager>();
             services.AddSingleton<InMemoryOsuTokenManager>();
             services.AddSingleton<IOsuTokenManager>(provider => provider.GetRequiredService<InMemoryOsuTokenManager>());

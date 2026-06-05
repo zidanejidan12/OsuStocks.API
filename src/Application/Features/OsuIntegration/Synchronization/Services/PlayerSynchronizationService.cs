@@ -1,6 +1,9 @@
+using MediatR;
 using OsuStocks.Application.Common.Interfaces;
+using OsuStocks.Application.Features.Market.Notifications;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
+using OsuStocks.Domain.OsuIntegration.Events;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Models;
 using OsuStocks.Domain.Repositories;
@@ -16,7 +19,8 @@ public sealed class PlayerSynchronizationService(
     IPlayerSnapshotRepository playerSnapshotRepository,
     IPlayerStockRepository playerStockRepository,
     IMarketEventRepository marketEventRepository,
-    IApplicationDbContext dbContext)
+    IApplicationDbContext dbContext,
+    IPublisher? publisher = null)
     : IPlayerSynchronizationService
 {
     public async Task<PlayerSynchronizationSummary> SynchronizeTrackedPlayersAsync(
@@ -94,6 +98,22 @@ public sealed class PlayerSynchronizationService(
                         };
 
                         await marketEventRepository.AddAsync(marketEvent, cancellationToken);
+
+                        if (publisher is not null)
+                        {
+                            switch (domainEvent)
+                            {
+                                case PpIncreased ppIncreased:
+                                    await publisher.Publish(new PpIncreasedNotification(ppIncreased), cancellationToken);
+                                    break;
+                                case TopPlayDetected topPlayDetected:
+                                    await publisher.Publish(new TopPlayDetectedNotification(topPlayDetected), cancellationToken);
+                                    break;
+                                case PlayerInactive inactive:
+                                    await publisher.Publish(new PlayerInactiveNotification(inactive), cancellationToken);
+                                    break;
+                            }
+                        }
                     }
                 }
 

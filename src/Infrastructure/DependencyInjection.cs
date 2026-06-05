@@ -5,8 +5,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
+using OsuStocks.Domain.Market.Interfaces;
 using OsuStocks.Domain.Repositories;
 using OsuStocks.Infrastructure.Authentication;
+using OsuStocks.Infrastructure.Market;
+using OsuStocks.Infrastructure.Market.Options;
 using OsuStocks.Infrastructure.BackgroundJobs;
 using OsuStocks.Infrastructure.OsuIntegration.Api;
 using OsuStocks.Infrastructure.OsuIntegration.OAuth;
@@ -34,6 +37,7 @@ public static class DependencyInjection
         services.Configure<OsuOAuthOptions>(configuration.GetSection(OsuOAuthOptions.SectionName));
         services.Configure<OsuApiOptions>(configuration.GetSection(OsuApiOptions.SectionName));
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<MarketEngineOptions>(configuration.GetSection(MarketEngineOptions.SectionName));
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(postgresConnection, npgsqlOptions =>
@@ -52,6 +56,9 @@ public static class DependencyInjection
         services.AddScoped<ITradeRepository, TradeRepository>();
         services.AddScoped<IPlayerSnapshotRepository, PlayerSnapshotRepository>();
         services.AddScoped<IMarketEventRepository, MarketEventRepository>();
+
+        services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
+        services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
         services.AddScoped<IAppTokenService, JwtAppTokenService>();
@@ -99,3 +106,5 @@ public static class DependencyInjection
         return services;
     }
 }
+
+
