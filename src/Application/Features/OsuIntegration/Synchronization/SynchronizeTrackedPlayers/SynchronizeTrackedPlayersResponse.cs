@@ -3,4 +3,5 @@ namespace OsuStocks.Application.Features.OsuIntegration.Synchronization.Synchron
 public sealed record SynchronizeTrackedPlayersResponse(
     int TrackedPlayers,
     int SnapshotsCreated,
-    int EventsDetected);
+    int EventsDetected,
+    int RankImprovementsDetected);

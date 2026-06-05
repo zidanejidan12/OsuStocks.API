@@ -1,3 +1,4 @@
+using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Repositories;
 using System.Collections.Concurrent;
@@ -60,6 +61,20 @@ internal sealed class InMemoryTrackedPlayerRepository : ITrackedPlayerRepository
             .Where(x => x.IsActive)
             .OrderBy(x => x.TrackingTier)
             .ThenBy(x => x.Username)
+            .Select(Clone)
+            .Cast<TrackedPlayer>()
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<TrackedPlayer>>(items);
+    }
+
+    public Task<IReadOnlyList<TrackedPlayer>> GetActiveByTierAsync(
+        TrackingTier tier,
+        CancellationToken cancellationToken = default)
+    {
+        var items = _trackedPlayers.Values
+            .Where(x => x.IsActive && x.TrackingTier == tier)
+            .OrderBy(x => x.Username)
             .Select(Clone)
             .Cast<TrackedPlayer>()
             .ToList();

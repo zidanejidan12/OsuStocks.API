@@ -15,7 +15,7 @@ public sealed class SnapshotComparisonService : ISnapshotComparisonService
     {
         if (previousSnapshot is null)
         {
-            return new SnapshotComparisonResult([], false);
+            return new SnapshotComparisonResult([], false, false);
         }
 
         var events = new List<OsuDomainEvent>();
@@ -40,6 +40,10 @@ public sealed class SnapshotComparisonService : ISnapshotComparisonService
                 now));
         }
 
+        var isRankImproved = previousSnapshot.GlobalRank.HasValue
+                             && currentProfile.GlobalRank.HasValue
+                             && currentProfile.GlobalRank.Value < previousSnapshot.GlobalRank.Value;
+
         var isInactive = previousSnapshot.CapturedAt <= now.AddDays(-14) &&
                          currentProfile.CurrentPp <= previousSnapshot.CurrentPp;
 
@@ -48,6 +52,6 @@ public sealed class SnapshotComparisonService : ISnapshotComparisonService
             events.Add(new PlayerInactive(trackedPlayerId, now));
         }
 
-        return new SnapshotComparisonResult(events, isInactive);
+        return new SnapshotComparisonResult(events, isInactive, isRankImproved);
     }
 }

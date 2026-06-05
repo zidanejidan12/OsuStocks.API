@@ -6,5 +6,8 @@ public sealed class SynchronizeTrackedPlayersCommandValidator : AbstractValidato
 {
     public SynchronizeTrackedPlayersCommandValidator()
     {
+        RuleFor(x => x.Tier)
+            .IsInEnum()
+            .When(x => x.Tier.HasValue);
     }
 }

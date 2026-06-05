@@ -7,6 +7,7 @@ using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.Repositories;
 using OsuStocks.Infrastructure.Authentication;
+using OsuStocks.Infrastructure.BackgroundJobs;
 using OsuStocks.Infrastructure.OsuIntegration.Api;
 using OsuStocks.Infrastructure.OsuIntegration.OAuth;
 using OsuStocks.Infrastructure.OsuIntegration.Options;
@@ -54,6 +55,9 @@ public static class DependencyInjection
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
         services.AddScoped<IAppTokenService, JwtAppTokenService>();
+
+        services.AddScoped<OsuSynchronizationRecurringJob>();
+        services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
 
         services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();
 
