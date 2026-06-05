@@ -77,6 +77,9 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
             services.AddSingleton<InMemoryMarketReadRepository>();
             services.AddSingleton<IMarketReadRepository>(provider => provider.GetRequiredService<InMemoryMarketReadRepository>());
 
+            services.RemoveAll<IStockPriceHistoryRepository>();
+            services.AddSingleton<InMemoryStockPriceHistoryRepository>();
+            services.AddSingleton<IStockPriceHistoryRepository>(provider => provider.GetRequiredService<InMemoryStockPriceHistoryRepository>());
             services.RemoveAll<IMarketSettingsRepository>();
             services.AddSingleton<InMemoryMarketSettingsRepository>();
             services.AddSingleton<IMarketSettingsRepository>(provider => provider.GetRequiredService<InMemoryMarketSettingsRepository>());
@@ -104,5 +107,7 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
         });
     }
 }
+
+
 
 

@@ -10,11 +10,14 @@ namespace OsuStocks.Application.Features.PlayerRegistry.AddTrackedPlayer;
 
 public sealed class AddTrackedPlayerCommandHandler(
     ITrackedPlayerRepository trackedPlayerRepository,
+    IPlayerStockRepository playerStockRepository,
     IOsuOAuthService osuOAuthService,
     IOsuApiClient osuApiClient,
     IApplicationDbContext dbContext)
     : IRequestHandler<AddTrackedPlayerCommand, Result<AddTrackedPlayerResponse>>
 {
+    private const decimal InitialStockPrice = 100m;
+
     public async Task<Result<AddTrackedPlayerResponse>> Handle(
         AddTrackedPlayerCommand request,
         CancellationToken cancellationToken)
@@ -32,6 +35,9 @@ public sealed class AddTrackedPlayerCommandHandler(
             var token = await osuOAuthService.GetClientCredentialsTokenAsync(cancellationToken);
             var osuUser = await osuApiClient.GetUserAsync(request.OsuUserId, token.AccessToken, cancellationToken);
 
+            var now = DateTimeOffset.UtcNow;
+            var actor = string.IsNullOrWhiteSpace(request.Actor) ? "admin" : request.Actor;
+
             var trackedPlayer = new TrackedPlayer
             {
                 Id = Guid.NewGuid(),
@@ -39,11 +45,25 @@ public sealed class AddTrackedPlayerCommandHandler(
                 Username = osuUser.Username,
                 TrackingTier = request.TrackingTier,
                 IsActive = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                CreatedBy = string.IsNullOrWhiteSpace(request.Actor) ? "admin" : request.Actor
+                CreatedAt = now,
+                CreatedBy = actor
             };
 
             await trackedPlayerRepository.AddAsync(trackedPlayer, cancellationToken);
+
+            var stock = new PlayerStock
+            {
+                Id = Guid.NewGuid(),
+                TrackedPlayerId = trackedPlayer.Id,
+                CurrentPrice = InitialStockPrice,
+                DemandScore = 0m,
+                PerformanceScore = 0m,
+                CreatedAt = now,
+                CreatedBy = actor,
+                LastUpdated = now
+            };
+
+            await playerStockRepository.AddAsync(stock, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new AddTrackedPlayerResponse(
