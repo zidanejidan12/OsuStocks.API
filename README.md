@@ -23,8 +23,8 @@ Implemented modules:
 
 Planned / partial:
 
-- Full market read endpoints (`/market/*`) from API spec are not fully exposed yet.
-- Wallet dedicated API endpoints (`/wallet`, `/wallet/transactions`) are still pending.
+- Leaderboards are postponed to Phase 1.5 (`/leaderboards/*`).
+- Market maintenance mode is postponed to Phase 1.5.
 
 ## Tech Stack
 
@@ -55,6 +55,7 @@ Planned / partial:
 |   |-- BUSINESS_RULES.md
 |   |-- CODING_STANDARDS.md
 |   |-- DATABASE.md
+|   |-- DEPLOYMENT.md
 |   |-- DOMAIN_MODEL.md
 |   |-- ROADMAP.md
 |   `-- USE_CASES.md
@@ -110,6 +111,17 @@ dotnet user-secrets set --project src/Api/OsuStocks.Api.csproj "Jwt:SigningKey" 
 
 Important: `OsuOAuth:RedirectUri` must exactly match the callback URL registered in your osu OAuth app.
 
+## Production Deployment
+
+Production security hardening is enforced for non-development environments:
+
+- Hangfire dashboard requires authenticated Admin role and HTTPS.
+- Swagger is disabled outside Development by default.
+- JWT metadata requires HTTPS outside Development.
+- Startup validates required production secrets from environment variables.
+
+See `docs/DEPLOYMENT.md` for full setup and environment variable requirements.
+
 ## Run Locally
 
 1. Restore and build:
@@ -146,8 +158,8 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 
 6. Open tools:
 
-- Swagger UI: `http://localhost:5065/swagger` (or the URL shown in startup logs)
-- Hangfire Dashboard: `http://localhost:5065/hangfire`
+- Swagger UI: `http://localhost:5065/swagger` (Development by default; set `Security__EnableSwagger=true` to enable outside Development)
+- Hangfire Dashboard: `http://localhost:5065/hangfire` (requires Admin role; non-development access also requires HTTPS)
 - Health: `GET /api/v1/health`
 
 ## API Coverage (Current)
@@ -155,32 +167,38 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 Implemented route groups:
 
 - `/api/v1/auth`
-- `/api/v1/admin/tracked-players`
+- `/api/v1/market`
+- `/api/v1/market/stocks`
 - `/api/v1/trading`
 - `/api/v1/portfolio`
+- `/api/v1/wallet`
+- `/api/v1/admin/tracked-players`
+- `/api/v1/admin/market-settings`
 - `/api/v1/health`
 
-Not fully implemented yet from `docs/API_SPEC.md`:
+Postponed from `docs/API_SPEC.md` (Phase 1.5):
 
-- `/api/v1/market/*`
-- `/api/v1/wallet*`
-- `/api/v1/leaderboards*`
+- `/api/v1/leaderboards/*`
+- Market maintenance mode behavior
 
 ## Testing
 
-Run all tests:
+Unit tests:
 
 ```powershell
-dotnet test OsuStocks.sln
+dotnet test tests/OsuStocks.Application.UnitTests/OsuStocks.Application.UnitTests.csproj
 ```
 
-Run key focused suites:
+Integration tests (PostgreSQL Testcontainers):
+
+- Require Docker (local or CI runner).
+- No local PostgreSQL instance is required.
 
 ```powershell
-dotnet test tests/OsuStocks.Application.UnitTests/OsuStocks.Application.UnitTests.csproj --filter "MarketPriceEngineTests|MarketEventProcessingServiceTests"
-dotnet test tests/OsuStocks.Api.IntegrationTests/OsuStocks.Api.IntegrationTests.csproj --filter "TradingEndpointsTests|PortfolioEndpointsTests|OAuthCallbackEndpointsTests"
+dotnet test tests/OsuStocks.Api.IntegrationTests/OsuStocks.Api.IntegrationTests.csproj --filter "WalletEndpointsTests|TradingEndpointsTests|PortfolioEndpointsTests|MarketEngineIntegrationTests"
 ```
 
+CI setup is included in `.github/workflows/integration-tests.yml`.
 ## QA Acceptance Checklist
 
 Use this document for milestone verification without reading source code:
@@ -209,3 +227,4 @@ Use this document for milestone verification without reading source code:
 dotnet build OsuStocks.sln
 dotnet test OsuStocks.sln
 ```
+

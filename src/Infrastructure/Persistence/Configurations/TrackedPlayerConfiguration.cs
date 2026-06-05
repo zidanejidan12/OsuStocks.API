@@ -22,6 +22,8 @@ internal sealed class TrackedPlayerConfiguration : IEntityTypeConfiguration<Trac
         builder.Property(x => x.UpdatedBy).HasColumnName("updated_by").HasMaxLength(100);
 
         builder.HasIndex(x => x.OsuUserId).IsUnique().HasDatabaseName("uq_tracked_players_osu_user_id");
+        builder.HasIndex(x => new { x.IsActive, x.TrackingTier, x.Username })
+            .HasDatabaseName("ix_tracked_players_active_tier_username");
 
         builder.HasOne(x => x.Stock)
             .WithOne(x => x.TrackedPlayer)

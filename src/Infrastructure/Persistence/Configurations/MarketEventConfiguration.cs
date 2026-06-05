@@ -17,7 +17,8 @@ internal sealed class MarketEventConfiguration : IEntityTypeConfiguration<Market
         builder.Property(x => x.Payload).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
-        builder.HasIndex(x => x.StockId).HasDatabaseName("ix_market_events_stock");
-        builder.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_market_events_created");
+        builder.HasIndex(x => new { x.StockId, x.CreatedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_market_events_stock_created_desc");
     }
 }

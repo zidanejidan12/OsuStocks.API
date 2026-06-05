@@ -1,9 +1,11 @@
 using Hangfire;
+using Hangfire.Dashboard;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OsuStocks.Api.Common;
+using OsuStocks.Api.Security;
 using OsuStocks.Application;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetOsuLoginUrl;
@@ -34,6 +36,10 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var swaggerEnabled = builder.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Security:EnableSwagger");
+
+ValidateProductionSecretEnvironmentVariables(builder.Configuration, builder.Environment);
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -49,7 +55,7 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.RequireHttpsMetadata = false;
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -64,6 +70,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IDashboardAuthorizationFilter, HangfireDashboardAuthorizationFilter>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -86,12 +93,15 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+if (swaggerEnabled)
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "OsuStocks API v1");
     options.RoutePrefix = "swagger";
 });
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -584,7 +594,13 @@ trackedPlayersGroup.MapPatch("/{id:guid}/disable", async (
     return Results.NoContent();
 });
 
-app.MapHangfireDashboard("/hangfire");
+var hangfireDashboardAuthorizationFilter = app.Services.GetRequiredService<IDashboardAuthorizationFilter>();
+
+app.MapHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = [hangfireDashboardAuthorizationFilter]
+})
+.RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
 
 app.Run();
 
@@ -609,6 +625,49 @@ static string? ResolveActor(ClaimsPrincipal principal)
     return principal.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? principal.FindFirstValue(ClaimTypes.Name)
         ?? principal.Identity?.Name;
+}
+
+static void ValidateProductionSecretEnvironmentVariables(IConfiguration configuration, IHostEnvironment environment)
+{
+    if (!environment.IsProduction())
+    {
+        return;
+    }
+
+    string[] requiredEnvironmentVariables =
+    [
+        "ConnectionStrings__Postgres",
+        "ConnectionStrings__Redis",
+        "OsuOAuth__ClientId",
+        "OsuOAuth__ClientSecret",
+        "OsuOAuth__RedirectUri",
+        "Jwt__Issuer",
+        "Jwt__Audience",
+        "Jwt__SigningKey"
+    ];
+
+    var missingVariables = requiredEnvironmentVariables
+        .Where(static key => string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key)))
+        .ToArray();
+
+    if (missingVariables.Length > 0)
+    {
+        throw new InvalidOperationException(
+            "Production requires secrets via environment variables. Missing: " + string.Join(", ", missingVariables));
+    }
+
+    EnsureNotPlaceholder("ConnectionStrings:Postgres", configuration.GetConnectionString("Postgres"));
+    EnsureNotPlaceholder("OsuOAuth:ClientSecret", configuration["OsuOAuth:ClientSecret"]);
+    EnsureNotPlaceholder("Jwt:SigningKey", configuration["Jwt:SigningKey"]);
+}
+
+static void EnsureNotPlaceholder(string key, string? value)
+{
+    if (string.IsNullOrWhiteSpace(value) || value.Contains("replace-with-", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            $"Configuration '{key}' must be a non-placeholder value in production.");
+    }
 }
 
 public sealed record AddTrackedPlayerRequest(long OsuUserId, TrackingTier TrackingTier = TrackingTier.Tier3);

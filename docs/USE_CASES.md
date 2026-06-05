@@ -99,7 +99,6 @@ Failure:
 
 * Insufficient balance
 * Stock disabled
-* Market maintenance mode
 
 ---
 
@@ -149,20 +148,16 @@ Portfolio displayed
 
 ## UC-007 View Leaderboards
 
+Status:
+Postponed to Phase 1.5
+
 Actor:
 Authenticated User
 
-Main Flow:
+Notes:
 
-1. User opens leaderboard
-2. System displays:
-
-   * Richest Users
-   * Highest ROI
-   * Best Performing Stocks
-
-Success:
-Leaderboard displayed
+- Leaderboards are not part of Phase 1 MVP.
+- This use case will be activated after MVP stabilization.
 
 ---
 
@@ -279,3 +274,4 @@ Main Flow:
 2. Grant reward
 3. Create ledger entries
 4. Notify users
+

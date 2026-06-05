@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using OsuStocks.Application.Features.OsuIntegration.Synchronization.SynchronizeTrackedPlayers;
 using OsuStocks.Domain.Common.Enums;
+using System.Diagnostics;
 
 namespace OsuStocks.Infrastructure.BackgroundJobs;
 
@@ -11,9 +12,31 @@ public sealed class OsuSynchronizationRecurringJob(
     ILogger<OsuSynchronizationRecurringJob> logger)
 {
     [AutomaticRetry(Attempts = 3)]
-    public async Task RunTierAsync(TrackingTier tier)
+    [DisableConcurrentExecution(timeoutInSeconds: 30)]
+    public Task RunTier1Async()
     {
+        return RunTierAsync(TrackingTier.Tier1);
+    }
+
+    [AutomaticRetry(Attempts = 3)]
+    [DisableConcurrentExecution(timeoutInSeconds: 30)]
+    public Task RunTier2Async()
+    {
+        return RunTierAsync(TrackingTier.Tier2);
+    }
+
+    [AutomaticRetry(Attempts = 3)]
+    [DisableConcurrentExecution(timeoutInSeconds: 30)]
+    public Task RunTier3Async()
+    {
+        return RunTierAsync(TrackingTier.Tier3);
+    }
+
+    private async Task RunTierAsync(TrackingTier tier)
+    {
+        var stopwatch = Stopwatch.StartNew();
         var result = await sender.Send(new SynchronizeTrackedPlayersCommand(tier));
+        stopwatch.Stop();
 
         if (!result.IsSuccess)
         {
@@ -22,6 +45,7 @@ public sealed class OsuSynchronizationRecurringJob(
                 tier,
                 result.Error?.Code,
                 result.Error?.Message);
+            OsuSynchronizationRecurringJobMetrics.RecordCompletion(tier, false, stopwatch.Elapsed, null);
             return;
         }
 
@@ -32,5 +56,6 @@ public sealed class OsuSynchronizationRecurringJob(
             result.Value?.SnapshotsCreated,
             result.Value?.EventsDetected,
             result.Value?.RankImprovementsDetected);
+        OsuSynchronizationRecurringJobMetrics.RecordCompletion(tier, true, stopwatch.Elapsed, result.Value);
     }
 }

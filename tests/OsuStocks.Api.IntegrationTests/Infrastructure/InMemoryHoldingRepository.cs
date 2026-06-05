@@ -73,6 +73,7 @@ internal sealed class InMemoryHoldingRepository : IHoldingRepository
             StockId = holding.StockId,
             Quantity = holding.Quantity,
             AveragePrice = holding.AveragePrice,
+            RowVersion = holding.RowVersion,
             CreatedAt = holding.CreatedAt,
             CreatedBy = holding.CreatedBy,
             UpdatedAt = holding.UpdatedAt,

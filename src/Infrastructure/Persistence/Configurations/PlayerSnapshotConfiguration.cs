@@ -19,7 +19,8 @@ internal sealed class PlayerSnapshotConfiguration : IEntityTypeConfiguration<Pla
         builder.Property(x => x.TopScorePp).HasColumnName("top_score_pp").HasPrecision(18, 2);
         builder.Property(x => x.CapturedAt).HasColumnName("captured_at").IsRequired();
 
-        builder.HasIndex(x => x.TrackedPlayerId).HasDatabaseName("ix_snapshot_player");
-        builder.HasIndex(x => x.CapturedAt).HasDatabaseName("ix_snapshot_time");
+        builder.HasIndex(x => new { x.TrackedPlayerId, x.CapturedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_snapshot_player_captured_desc");
     }
 }

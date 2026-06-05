@@ -66,6 +66,7 @@ internal sealed class InMemoryPlayerStockRepository : IPlayerStockRepository
             CurrentPrice = stock.CurrentPrice,
             DemandScore = stock.DemandScore,
             PerformanceScore = stock.PerformanceScore,
+            RowVersion = stock.RowVersion,
             CreatedAt = stock.CreatedAt,
             CreatedBy = stock.CreatedBy,
             LastUpdated = stock.LastUpdated,

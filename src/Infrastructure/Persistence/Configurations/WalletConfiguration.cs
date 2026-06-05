@@ -14,6 +14,11 @@ internal sealed class WalletConfiguration : IEntityTypeConfiguration<Wallet>
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(x => x.Balance).HasColumnName("balance").HasPrecision(18, 2).IsRequired();
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1L)
+            .IsConcurrencyToken()
+            .IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");

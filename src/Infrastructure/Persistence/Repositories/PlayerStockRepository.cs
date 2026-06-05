@@ -36,6 +36,14 @@ internal sealed class PlayerStockRepository(AppDbContext dbContext) : IPlayerSto
 
     public void Update(PlayerStock playerStock)
     {
-        dbContext.PlayerStocks.Update(playerStock);
+        var entry = dbContext.Entry(playerStock);
+        if (entry.State == EntityState.Detached)
+        {
+            dbContext.PlayerStocks.Attach(playerStock);
+            entry = dbContext.Entry(playerStock);
+        }
+
+        entry.State = EntityState.Modified;
+        entry.Property(x => x.RowVersion).OriginalValue = playerStock.RowVersion;
     }
 }

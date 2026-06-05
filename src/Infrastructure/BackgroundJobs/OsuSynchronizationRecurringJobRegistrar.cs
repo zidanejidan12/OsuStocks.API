@@ -1,5 +1,4 @@
 using Hangfire;
-using OsuStocks.Domain.Common.Enums;
 
 namespace OsuStocks.Infrastructure.BackgroundJobs;
 
@@ -10,17 +9,17 @@ public sealed class OsuSynchronizationRecurringJobRegistrar(IRecurringJobManager
     {
         recurringJobManager.AddOrUpdate<OsuSynchronizationRecurringJob>(
             "osu-sync-tier1",
-            job => job.RunTierAsync(TrackingTier.Tier1),
+            job => job.RunTier1Async(),
             Cron.Minutely());
 
         recurringJobManager.AddOrUpdate<OsuSynchronizationRecurringJob>(
             "osu-sync-tier2",
-            job => job.RunTierAsync(TrackingTier.Tier2),
+            job => job.RunTier2Async(),
             "*/5 * * * *");
 
         recurringJobManager.AddOrUpdate<OsuSynchronizationRecurringJob>(
             "osu-sync-tier3",
-            job => job.RunTierAsync(TrackingTier.Tier3),
+            job => job.RunTier3Async(),
             "*/15 * * * *");
     }
 }

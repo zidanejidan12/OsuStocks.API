@@ -1,7 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OsuStocks.Api.IntegrationTests.Infrastructure;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
+using OsuStocks.Infrastructure.Persistence;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -9,91 +11,106 @@ using Xunit;
 
 namespace OsuStocks.Api.IntegrationTests;
 
-public sealed class TradingEndpointsTests
+[Collection(PostgresCollection.Name)]
+public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
 {
     private static readonly Guid TestUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     [Fact]
     public async Task BuyAndSellFlow_UpdatesWallet_TracksImmutableLedger_AndRecordsPriceHistory()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new PostgresWebApplicationFactory(fixture);
         using var client = factory.CreateClient();
 
-        using var scope = factory.Services.CreateScope();
-        var walletRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletRepository>();
-        var portfolioRepository = scope.ServiceProvider.GetRequiredService<InMemoryPortfolioRepository>();
-        var trackedPlayerRepository = scope.ServiceProvider.GetRequiredService<InMemoryTrackedPlayerRepository>();
-        var playerStockRepository = scope.ServiceProvider.GetRequiredService<InMemoryPlayerStockRepository>();
-        var walletTransactionRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletTransactionRepository>();
-        var stockPriceHistoryRepository = scope.ServiceProvider.GetRequiredService<InMemoryStockPriceHistoryRepository>();
+        Guid stockId;
 
-        await walletRepository.AddAsync(new Wallet
+        using (var scope = factory.Services.CreateScope())
         {
-            Id = Guid.NewGuid(),
-            UserId = TestUserId,
-            Balance = 1_000_000m,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        });
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var portfolio = new Portfolio
-        {
-            Id = Guid.NewGuid(),
-            UserId = TestUserId,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        };
-        await portfolioRepository.AddAsync(portfolio);
+            dbContext.Users.Add(CreateUser(TestUserId, 502001));
 
-        var trackedPlayer = new TrackedPlayer
-        {
-            Id = Guid.NewGuid(),
-            OsuUserId = 777,
-            Username = "player-777",
-            TrackingTier = TrackingTier.Tier2,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        };
-        await trackedPlayerRepository.AddAsync(trackedPlayer);
+            dbContext.Wallets.Add(new Wallet
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                Balance = 1_000_000m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            });
 
-        var stock = new PlayerStock
-        {
-            Id = Guid.NewGuid(),
-            TrackedPlayerId = trackedPlayer.Id,
-            CurrentPrice = 2m,
-            DemandScore = 1m,
-            PerformanceScore = 1m,
-            CreatedAt = DateTimeOffset.UtcNow,
-            LastUpdated = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        };
-        await playerStockRepository.AddAsync(stock);
+            var portfolio = new Portfolio
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+            dbContext.Portfolios.Add(portfolio);
+
+            var trackedPlayer = new TrackedPlayer
+            {
+                Id = Guid.NewGuid(),
+                OsuUserId = 777,
+                Username = "player-777",
+                TrackingTier = TrackingTier.Tier2,
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+            dbContext.TrackedPlayers.Add(trackedPlayer);
+
+            var stock = new PlayerStock
+            {
+                Id = Guid.NewGuid(),
+                TrackedPlayerId = trackedPlayer.Id,
+                CurrentPrice = 2m,
+                DemandScore = 1m,
+                PerformanceScore = 1m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                LastUpdated = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+            dbContext.PlayerStocks.Add(stock);
+            stockId = stock.Id;
+
+            await dbContext.SaveChangesAsync();
+        }
 
         var buyResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/buy",
-            new TradeRequest(stock.Id, 500));
+            new TradeRequest(stockId, 500));
 
         buyResponse.EnsureSuccessStatusCode();
 
-        var walletAfterBuy = await walletRepository.GetByUserIdAsync(TestUserId);
-        Assert.NotNull(walletAfterBuy);
-        Assert.Equal(999000m, walletAfterBuy.Balance);
+        decimal walletAfterBuyBalance;
+        Guid walletId;
 
-        var walletTransactionsAfterBuy = await walletTransactionRepository.GetByWalletIdAsync(walletAfterBuy.Id, 0, 10);
-        var buyLedgerEntry = Assert.Single(walletTransactionsAfterBuy);
-        Assert.Equal(WalletTransactionType.BuyStock, buyLedgerEntry.TransactionType);
-        Assert.Equal(1000m, buyLedgerEntry.Amount);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var walletAfterBuy = await dbContext.Wallets.AsNoTracking().SingleAsync(x => x.UserId == TestUserId);
+
+            walletAfterBuyBalance = walletAfterBuy.Balance;
+            walletId = walletAfterBuy.Id;
+
+            var walletTransactionsAfterBuy = await dbContext.WalletTransactions
+                .AsNoTracking()
+                .Where(x => x.WalletId == walletAfterBuy.Id)
+                .ToListAsync();
+
+            var buyLedgerEntry = Assert.Single(walletTransactionsAfterBuy);
+            Assert.Equal(WalletTransactionType.BuyStock, buyLedgerEntry.TransactionType);
+            Assert.Equal(1000m, buyLedgerEntry.Amount);
+        }
+
+        Assert.Equal(999000m, walletAfterBuyBalance);
 
         var sellResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/sell",
-            new TradeRequest(stock.Id, 500));
+            new TradeRequest(stockId, 500));
 
         sellResponse.EnsureSuccessStatusCode();
-
-        var walletAfterSell = await walletRepository.GetByUserIdAsync(TestUserId);
-        Assert.NotNull(walletAfterSell);
-        Assert.Equal(1_001_250m, walletAfterSell.Balance);
 
         var historyResponse = await client.GetAsync("/api/v1/trading/history?page=1&pageSize=10");
         historyResponse.EnsureSuccessStatusCode();
@@ -111,78 +128,113 @@ public sealed class TradingEndpointsTests
         Assert.NotNull(holdingsAfterSell);
         Assert.Empty(holdingsAfterSell.Items);
 
-        var ledgerAfterSell = await walletTransactionRepository.GetByWalletIdAsync(walletAfterSell.Id, 0, 10);
-        Assert.Equal(2, ledgerAfterSell.Count);
-        Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.BuyStock && x.Id == buyLedgerEntry.Id && x.Amount == buyLedgerEntry.Amount);
-        Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.SellStock);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var updatedStock = await playerStockRepository.GetByIdAsync(stock.Id);
-        Assert.NotNull(updatedStock);
-        Assert.True(updatedStock.CurrentPrice >= 1m);
+            var walletAfterSell = await dbContext.Wallets.AsNoTracking().SingleAsync(x => x.UserId == TestUserId);
 
-        var priceHistory = stockPriceHistoryRepository.GetAllForStock(stock.Id);
-        Assert.Equal(2, priceHistory.Count);
-        Assert.Equal(PriceChangeReason.BuyPressure, priceHistory[0].Reason);
-        Assert.Equal(PriceChangeReason.SellPressure, priceHistory[1].Reason);
+            var trades = await dbContext.Trades
+                .AsNoTracking()
+                .Where(x => x.UserId == TestUserId)
+                .ToListAsync();
+
+            Assert.Equal(2, trades.Count);
+
+            var buyTrade = trades.Single(x => x.TradeType == TradeType.Buy);
+            var sellTrade = trades.Single(x => x.TradeType == TradeType.Sell);
+
+            var expectedBalance = 1_000_000m - buyTrade.TotalAmount + sellTrade.TotalAmount;
+            Assert.Equal(expectedBalance, walletAfterSell.Balance);
+
+            var ledgerAfterSell = await dbContext.WalletTransactions
+                .AsNoTracking()
+                .Where(x => x.WalletId == walletId)
+                .ToListAsync();
+
+            Assert.Equal(2, ledgerAfterSell.Count);
+            Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.BuyStock);
+            Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.SellStock);
+
+            var updatedStock = await dbContext.PlayerStocks.AsNoTracking().SingleAsync(x => x.Id == stockId);
+            Assert.True(updatedStock.CurrentPrice >= 1m);
+
+            var priceHistory = await dbContext.StockPriceHistory
+                .AsNoTracking()
+                .Where(x => x.StockId == stockId)
+                .OrderBy(x => x.CreatedAt)
+                .ToListAsync();
+
+            Assert.Equal(2, priceHistory.Count);
+            Assert.Equal(PriceChangeReason.BuyPressure, priceHistory[0].Reason);
+            Assert.Equal(PriceChangeReason.SellPressure, priceHistory[1].Reason);
+        }
     }
 
     [Fact]
     public async Task BuyStock_WithInsufficientBalance_ReturnsBadRequest()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using var factory = new PostgresWebApplicationFactory(fixture);
         using var client = factory.CreateClient();
 
-        using var scope = factory.Services.CreateScope();
-        var walletRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletRepository>();
-        var portfolioRepository = scope.ServiceProvider.GetRequiredService<InMemoryPortfolioRepository>();
-        var trackedPlayerRepository = scope.ServiceProvider.GetRequiredService<InMemoryTrackedPlayerRepository>();
-        var playerStockRepository = scope.ServiceProvider.GetRequiredService<InMemoryPlayerStockRepository>();
+        Guid stockId;
 
-        await walletRepository.AddAsync(new Wallet
+        using (var scope = factory.Services.CreateScope())
         {
-            Id = Guid.NewGuid(),
-            UserId = TestUserId,
-            Balance = 50m,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        });
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await portfolioRepository.AddAsync(new Portfolio
-        {
-            Id = Guid.NewGuid(),
-            UserId = TestUserId,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        });
+            dbContext.Users.Add(CreateUser(TestUserId, 502002));
 
-        var trackedPlayer = new TrackedPlayer
-        {
-            Id = Guid.NewGuid(),
-            OsuUserId = 778,
-            Username = "player-778",
-            TrackingTier = TrackingTier.Tier2,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        };
-        await trackedPlayerRepository.AddAsync(trackedPlayer);
+            dbContext.Wallets.Add(new Wallet
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                Balance = 50m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            });
 
-        var stock = new PlayerStock
-        {
-            Id = Guid.NewGuid(),
-            TrackedPlayerId = trackedPlayer.Id,
-            CurrentPrice = 100m,
-            DemandScore = 1m,
-            PerformanceScore = 1m,
-            CreatedAt = DateTimeOffset.UtcNow,
-            LastUpdated = DateTimeOffset.UtcNow,
-            CreatedBy = "seed"
-        };
-        await playerStockRepository.AddAsync(stock);
+            dbContext.Portfolios.Add(new Portfolio
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            });
+
+            var trackedPlayer = new TrackedPlayer
+            {
+                Id = Guid.NewGuid(),
+                OsuUserId = 778,
+                Username = "player-778",
+                TrackingTier = TrackingTier.Tier2,
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+            dbContext.TrackedPlayers.Add(trackedPlayer);
+
+            var stock = new PlayerStock
+            {
+                Id = Guid.NewGuid(),
+                TrackedPlayerId = trackedPlayer.Id,
+                CurrentPrice = 100m,
+                DemandScore = 1m,
+                PerformanceScore = 1m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                LastUpdated = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+
+            dbContext.PlayerStocks.Add(stock);
+            stockId = stock.Id;
+
+            await dbContext.SaveChangesAsync();
+        }
 
         var response = await client.PostAsJsonAsync(
             "/api/v1/trading/buy",
-            new TradeRequest(stock.Id, 1));
+            new TradeRequest(stockId, 1));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -191,18 +243,32 @@ public sealed class TradingEndpointsTests
         Assert.Equal("INSUFFICIENT_BALANCE", error.Code);
     }
 
+    private static User CreateUser(Guid userId, long osuUserId)
+    {
+        return new User
+        {
+            Id = userId,
+            OsuUserId = osuUserId,
+            Username = $"user-{osuUserId}",
+            Role = UserRole.User,
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "seed"
+        };
+    }
+
     private sealed record TradeRequest(Guid StockId, int Quantity);
 
     private sealed record HoldingsEnvelope([property: JsonPropertyName("items")] List<HoldingItem> Items);
+
     private sealed record HoldingItem(
         [property: JsonPropertyName("quantity")] int Quantity,
         [property: JsonPropertyName("averagePrice")] decimal AveragePrice);
 
     private sealed record HistoryEnvelope([property: JsonPropertyName("items")] List<HistoryItem> Items);
+
     private sealed record HistoryItem([property: JsonPropertyName("tradeType")] string TradeType);
 
     private sealed record ErrorResponse(
         [property: JsonPropertyName("code")] string Code,
         [property: JsonPropertyName("message")] string Message);
 }
-

@@ -227,17 +227,6 @@ Direct user-triggered synchronization prohibited.
 
 # Administrative Rules
 
-## BR-060 Market Maintenance
-
-Administrator may enable maintenance mode.
-
-Effects:
-
-* Trading disabled
-* Viewing remains available
-
----
-
 ## BR-061 Coefficient Management
 
 Administrators may adjust:
@@ -247,3 +236,20 @@ Administrators may adjust:
 * Decay coefficient
 
 Changes affect future calculations only.
+
+---
+
+# Postponed Rules (Phase 1.5)
+
+## BR-060 Market Maintenance
+
+Status:
+Postponed
+
+Administrator may enable maintenance mode.
+
+Effects:
+
+* Trading disabled
+* Viewing remains available
+

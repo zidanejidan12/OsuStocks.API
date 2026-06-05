@@ -9,6 +9,16 @@ This document defines backend acceptance tests for Phase 1 MVP modules so QA can
 - Authentication: Bearer JWT from osu! OAuth callback
 - Test tools: Swagger or Postman + SQL client
 
+## MVP Scope Clarification
+
+Phase 1 acceptance excludes postponed Phase 1.5 features:
+
+- Leaderboards (`/leaderboards/*`)
+- Market maintenance mode
+
+Do not treat these as Phase 1 failures.
+
+---
 ## Shared Test Data
 
 Use these placeholders in requests and SQL:
@@ -413,3 +423,4 @@ LIMIT 50;
 - Portfolio summary and holdings are consistent with DB calculations.
 - Market Engine updates prices from trade + performance + inactivity signals.
 - Price floor rule (`>= 1`) is always enforced.
+

@@ -16,6 +16,11 @@ internal sealed class PlayerStockConfiguration : IEntityTypeConfiguration<Player
         builder.Property(x => x.CurrentPrice).HasColumnName("current_price").HasPrecision(18, 2).IsRequired();
         builder.Property(x => x.DemandScore).HasColumnName("demand_score").HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.PerformanceScore).HasColumnName("performance_score").HasPrecision(18, 4).IsRequired();
+        builder.Property(x => x.RowVersion)
+            .HasColumnName("row_version")
+            .HasDefaultValue(1L)
+            .IsConcurrencyToken()
+            .IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(x => x.LastUpdated).HasColumnName("last_updated").IsRequired();

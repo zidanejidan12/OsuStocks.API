@@ -177,7 +177,6 @@ Errors:
 
 404 StockNotFound
 
-409 MarketMaintenance
 
 ---
 
@@ -291,47 +290,16 @@ Response:
 
 ---
 
-# Leaderboards
+# Postponed Endpoints (Phase 1.5)
 
-## GET /leaderboards/richest
+Leaderboards are postponed and are not part of the current MVP release scope.
 
-Purpose:
+Planned after MVP:
 
-Top balances.
-
-Response:
-
-{
-"items": []
-}
-
----
-
-## GET /leaderboards/investors
-
-Purpose:
-
-Highest ROI.
-
-Response:
-
-{
-"items": []
-}
-
----
-
-## GET /leaderboards/stocks
-
-Purpose:
-
-Best performing stocks.
-
-Response:
-
-{
-"items": []
-}
+- `GET /leaderboards/richest`
+- `GET /leaderboards/investors`
+- `GET /leaderboards/stocks`
+- Trading maintenance-mode behavior (including `409 MarketMaintenance`)
 
 ---
 
@@ -478,3 +446,4 @@ Future:
 /api/v2
 
 Breaking changes require new version.
+

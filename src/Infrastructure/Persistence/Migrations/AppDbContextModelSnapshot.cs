@@ -51,6 +51,13 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("row_version");
+
                     b.Property<Guid>("StockId")
                         .HasColumnType("uuid")
                         .HasColumnName("stock_id");
@@ -104,11 +111,9 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_market_events_created");
-
-                    b.HasIndex("StockId")
-                        .HasDatabaseName("ix_market_events_stock");
+                    b.HasIndex("StockId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_market_events_stock_created_desc");
 
                     b.ToTable("market_events", (string)null);
                 });
@@ -190,11 +195,9 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CapturedAt")
-                        .HasDatabaseName("ix_snapshot_time");
-
-                    b.HasIndex("TrackedPlayerId")
-                        .HasDatabaseName("ix_snapshot_player");
+                    b.HasIndex("TrackedPlayerId", "CapturedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_snapshot_player_captured_desc");
 
                     b.ToTable("player_snapshots", (string)null);
                 });
@@ -233,6 +236,13 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("performance_score");
+
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("row_version");
 
                     b.Property<Guid>("TrackedPlayerId")
                         .HasColumnType("uuid")
@@ -330,11 +340,9 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_stock_history_created");
-
-                    b.HasIndex("StockId")
-                        .HasDatabaseName("ix_stock_history_stock");
+                    b.HasIndex("StockId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_stock_history_stock_created_desc");
 
                     b.ToTable("stock_price_history", (string)null);
                 });
@@ -390,6 +398,9 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_tracked_players_osu_user_id");
 
+                    b.HasIndex("IsActive", "TrackingTier", "Username")
+                        .HasDatabaseName("ix_tracked_players_active_tier_username");
+
                     b.ToTable("tracked_players", (string)null);
                 });
 
@@ -434,14 +445,12 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExecutedAt")
-                        .HasDatabaseName("ix_trade_executed");
-
                     b.HasIndex("StockId")
                         .HasDatabaseName("ix_trade_stock");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_trade_user");
+                    b.HasIndex("UserId", "ExecutedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_trade_user_executed_desc");
 
                     b.ToTable("trades", (string)null);
                 });
@@ -529,6 +538,13 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("created_by");
 
+                    b.Property<long>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("row_version");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -583,11 +599,9 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_wallet_transactions_created_at");
-
-                    b.HasIndex("WalletId")
-                        .HasDatabaseName("ix_wallet_transactions_wallet_id");
+                    b.HasIndex("WalletId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_wallet_transactions_wallet_created_desc");
 
                     b.ToTable("wallet_transactions", (string)null);
                 });
