@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IPlayerSnapshotRepository, PlayerSnapshotRepository>();
         services.AddScoped<IMarketEventRepository, MarketEventRepository>();
         services.AddScoped<IMarketReadRepository, MarketReadRepository>();
+        services.AddScoped<IMarketSettingsRepository, MarketSettingsRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
@@ -107,6 +108,8 @@ public static class DependencyInjection
         return services;
     }
 }
+
+
 
 
 

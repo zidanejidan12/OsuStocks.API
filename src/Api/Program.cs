@@ -23,6 +23,8 @@ using OsuStocks.Application.Features.Trading.GetTradeHistory;
 using OsuStocks.Application.Features.Portfolio.GetPortfolioSummary;
 using OsuStocks.Application.Features.Wallet.GetWallet;
 using OsuStocks.Application.Features.Wallet.GetWalletTransactions;
+using OsuStocks.Application.Features.Admin.MarketSettings.GetMarketSettings;
+using OsuStocks.Application.Features.Admin.MarketSettings.UpdateMarketSettings;
 using OsuStocks.Application.Features.Trading.SellStock;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
@@ -450,6 +452,49 @@ walletGroup.MapGet("/transactions", async (
 var adminGroup = app.MapGroup("/api/v1/admin")
     .RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
 
+adminGroup.MapGet("/market-settings", async (
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new GetMarketSettingsQuery(), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        ppMultiplier = result.Value.PpMultiplier,
+        tradeMultiplier = result.Value.TradeMultiplier,
+        decayMultiplier = result.Value.DecayMultiplier
+    });
+});
+
+adminGroup.MapPut("/market-settings", async (
+    UpdateMarketSettingsRequest request,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var actor = ResolveActor(principal);
+    var result = await sender.Send(
+        new UpdateMarketSettingsCommand(
+            request.PpMultiplier,
+            request.TradeMultiplier,
+            request.DecayMultiplier,
+            actor),
+        cancellationToken);
+
+    if (!result.IsSuccess)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.NoContent();
+});
+
 var trackedPlayersGroup = adminGroup.MapGroup("/tracked-players");
 
 trackedPlayersGroup.MapGet("", async (
@@ -567,11 +612,16 @@ static string? ResolveActor(ClaimsPrincipal principal)
 }
 
 public sealed record AddTrackedPlayerRequest(long OsuUserId, TrackingTier TrackingTier = TrackingTier.Tier3);
+public sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier);
 public sealed record TradeStockRequest(Guid StockId, int Quantity);
 
 public partial class Program
 {
 }
+
+
+
+
 
 
 
