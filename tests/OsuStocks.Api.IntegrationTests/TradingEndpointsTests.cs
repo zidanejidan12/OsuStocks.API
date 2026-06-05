@@ -14,7 +14,7 @@ public sealed class TradingEndpointsTests
     private static readonly Guid TestUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     [Fact]
-    public async Task BuyAndSellFlow_UpdatesWallet_AndExposesHistoryAndHoldings()
+    public async Task BuyAndSellFlow_UpdatesWallet_TracksImmutableLedger_AndRecordsPriceHistory()
     {
         await using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -24,12 +24,14 @@ public sealed class TradingEndpointsTests
         var portfolioRepository = scope.ServiceProvider.GetRequiredService<InMemoryPortfolioRepository>();
         var trackedPlayerRepository = scope.ServiceProvider.GetRequiredService<InMemoryTrackedPlayerRepository>();
         var playerStockRepository = scope.ServiceProvider.GetRequiredService<InMemoryPlayerStockRepository>();
+        var walletTransactionRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletTransactionRepository>();
+        var stockPriceHistoryRepository = scope.ServiceProvider.GetRequiredService<InMemoryStockPriceHistoryRepository>();
 
         await walletRepository.AddAsync(new Wallet
         {
             Id = Guid.NewGuid(),
             UserId = TestUserId,
-            Balance = 1000m,
+            Balance = 1_000_000m,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedBy = "seed"
         });
@@ -59,7 +61,7 @@ public sealed class TradingEndpointsTests
         {
             Id = Guid.NewGuid(),
             TrackedPlayerId = trackedPlayer.Id,
-            CurrentPrice = 100m,
+            CurrentPrice = 2m,
             DemandScore = 1m,
             PerformanceScore = 1m,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -70,32 +72,28 @@ public sealed class TradingEndpointsTests
 
         var buyResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/buy",
-            new TradeRequest(stock.Id, 3));
+            new TradeRequest(stock.Id, 500));
 
         buyResponse.EnsureSuccessStatusCode();
 
         var walletAfterBuy = await walletRepository.GetByUserIdAsync(TestUserId);
         Assert.NotNull(walletAfterBuy);
-        Assert.Equal(700m, walletAfterBuy.Balance);
+        Assert.Equal(999000m, walletAfterBuy.Balance);
 
-        var holdingsAfterBuyResponse = await client.GetAsync("/api/v1/portfolio/holdings");
-        holdingsAfterBuyResponse.EnsureSuccessStatusCode();
-
-        var holdingsAfterBuy = await holdingsAfterBuyResponse.Content.ReadFromJsonAsync<HoldingsEnvelope>();
-        Assert.NotNull(holdingsAfterBuy);
-        Assert.Single(holdingsAfterBuy.Items);
-        Assert.Equal(3, holdingsAfterBuy.Items[0].Quantity);
-        Assert.Equal(100m, holdingsAfterBuy.Items[0].AveragePrice);
+        var walletTransactionsAfterBuy = await walletTransactionRepository.GetByWalletIdAsync(walletAfterBuy.Id, 0, 10);
+        var buyLedgerEntry = Assert.Single(walletTransactionsAfterBuy);
+        Assert.Equal(WalletTransactionType.BuyStock, buyLedgerEntry.TransactionType);
+        Assert.Equal(1000m, buyLedgerEntry.Amount);
 
         var sellResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/sell",
-            new TradeRequest(stock.Id, 2));
+            new TradeRequest(stock.Id, 500));
 
         sellResponse.EnsureSuccessStatusCode();
 
         var walletAfterSell = await walletRepository.GetByUserIdAsync(TestUserId);
         Assert.NotNull(walletAfterSell);
-        Assert.Equal(901.5m, walletAfterSell.Balance);
+        Assert.Equal(1_001_250m, walletAfterSell.Balance);
 
         var historyResponse = await client.GetAsync("/api/v1/trading/history?page=1&pageSize=10");
         historyResponse.EnsureSuccessStatusCode();
@@ -111,8 +109,21 @@ public sealed class TradingEndpointsTests
 
         var holdingsAfterSell = await holdingsAfterSellResponse.Content.ReadFromJsonAsync<HoldingsEnvelope>();
         Assert.NotNull(holdingsAfterSell);
-        Assert.Single(holdingsAfterSell.Items);
-        Assert.Equal(1, holdingsAfterSell.Items[0].Quantity);
+        Assert.Empty(holdingsAfterSell.Items);
+
+        var ledgerAfterSell = await walletTransactionRepository.GetByWalletIdAsync(walletAfterSell.Id, 0, 10);
+        Assert.Equal(2, ledgerAfterSell.Count);
+        Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.BuyStock && x.Id == buyLedgerEntry.Id && x.Amount == buyLedgerEntry.Amount);
+        Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.SellStock);
+
+        var updatedStock = await playerStockRepository.GetByIdAsync(stock.Id);
+        Assert.NotNull(updatedStock);
+        Assert.True(updatedStock.CurrentPrice >= 1m);
+
+        var priceHistory = stockPriceHistoryRepository.GetAllForStock(stock.Id);
+        Assert.Equal(2, priceHistory.Count);
+        Assert.Equal(PriceChangeReason.BuyPressure, priceHistory[0].Reason);
+        Assert.Equal(PriceChangeReason.SellPressure, priceHistory[1].Reason);
     }
 
     [Fact]

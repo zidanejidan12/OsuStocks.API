@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using OsuStocks.Api.IntegrationTests.Infrastructure;
 using System.Net;
 using System.Net.Http.Json;
@@ -25,7 +26,7 @@ public sealed class PlayerRegistryEndpointsTests
     }
 
     [Fact]
-    public async Task AddTrackedPlayer_ThenList_ReturnsAddedPlayer()
+    public async Task AddTrackedPlayer_ThenList_ReturnsAddedPlayer_AndCreatesStock()
     {
         await using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -48,6 +49,14 @@ public sealed class PlayerRegistryEndpointsTests
 
         Assert.NotNull(listPayload);
         Assert.Contains(listPayload.Items, item => item.TrackedPlayerId == added.TrackedPlayerId && item.IsActive);
+
+        using var scope = factory.Services.CreateScope();
+        var stockRepository = scope.ServiceProvider.GetRequiredService<InMemoryPlayerStockRepository>();
+        var stock = await stockRepository.GetByTrackedPlayerIdAsync(added.TrackedPlayerId);
+
+        Assert.NotNull(stock);
+        Assert.Equal(added.TrackedPlayerId, stock.TrackedPlayerId);
+        Assert.True(stock.CurrentPrice > 0m);
     }
 
     [Fact]
