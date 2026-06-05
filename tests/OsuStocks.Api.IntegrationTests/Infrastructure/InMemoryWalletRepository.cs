@@ -1,4 +1,5 @@
 using OsuStocks.Domain.Entities;
+using OsuStocks.Domain.Models;
 using OsuStocks.Domain.Repositories;
 using System.Collections.Concurrent;
 
@@ -26,6 +27,21 @@ internal sealed class InMemoryWalletRepository : IWalletRepository
 
         _walletsById.TryGetValue(walletId, out var wallet);
         return Task.FromResult(Clone(wallet));
+    }
+
+    public Task<WalletBalanceReadModel?> GetBalanceByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (!_walletIdsByUserId.TryGetValue(userId, out var walletId))
+        {
+            return Task.FromResult<WalletBalanceReadModel?>(null);
+        }
+
+        if (!_walletsById.TryGetValue(walletId, out var wallet))
+        {
+            return Task.FromResult<WalletBalanceReadModel?>(null);
+        }
+
+        return Task.FromResult<WalletBalanceReadModel?>(new WalletBalanceReadModel(wallet.Balance));
     }
 
     public Task AddAsync(Wallet wallet, CancellationToken cancellationToken = default)
