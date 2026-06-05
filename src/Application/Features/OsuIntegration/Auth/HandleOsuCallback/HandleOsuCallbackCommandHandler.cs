@@ -74,7 +74,7 @@ public sealed class HandleOsuCallbackCommandHandler(
                 };
                 await walletTransactionRepository.AddAsync(initialGrant, cancellationToken);
 
-                var portfolio = new Portfolio
+                var portfolio = new OsuStocks.Domain.Entities.Portfolio
                 {
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
@@ -110,3 +110,4 @@ public sealed class HandleOsuCallbackCommandHandler(
         }
     }
 }
+

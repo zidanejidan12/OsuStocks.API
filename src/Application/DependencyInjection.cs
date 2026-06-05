@@ -4,8 +4,9 @@ using MapsterMapper;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using OsuStocks.Application.Common.Behaviors;
-using OsuStocks.Domain.OsuIntegration.Interfaces;
+using OsuStocks.Application.Features.Market.Services;
 using OsuStocks.Application.Features.OsuIntegration.Synchronization.Services;
+using OsuStocks.Domain.OsuIntegration.Interfaces;
 using System.Reflection;
 
 namespace OsuStocks.Application;
@@ -28,6 +29,7 @@ public static class DependencyInjection
 
         services.AddScoped<ISnapshotComparisonService, SnapshotComparisonService>();
         services.AddScoped<IPlayerSynchronizationService, PlayerSynchronizationService>();
+        services.AddScoped<IMarketEventProcessingService, MarketEventProcessingService>();
 
         return services;
     }

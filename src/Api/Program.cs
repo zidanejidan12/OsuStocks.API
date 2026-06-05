@@ -13,6 +13,11 @@ using OsuStocks.Application.Features.PlayerRegistry.DisableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.EnableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.ListTrackedPlayers;
 using OsuStocks.Application.Features.PlayerRegistry.SearchOsuPlayers;
+using OsuStocks.Application.Features.Trading.BuyStock;
+using OsuStocks.Application.Features.Trading.GetHoldings;
+using OsuStocks.Application.Features.Trading.GetTradeHistory;
+using OsuStocks.Application.Features.Portfolio.GetPortfolioSummary;
+using OsuStocks.Application.Features.Trading.SellStock;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
 using OsuStocks.Infrastructure.Authentication;
@@ -130,8 +135,7 @@ authGroup.MapGet("/me", async (
     HttpContext httpContext,
     CancellationToken cancellationToken) =>
 {
-    var userIdValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!Guid.TryParse(userIdValue, out var userId))
+    if (!TryResolveUserId(principal, out var userId))
     {
         return Results.Json(new
         {
@@ -156,6 +160,134 @@ authGroup.MapGet("/me", async (
     });
 })
 .RequireAuthorization();
+
+var tradingGroup = app.MapGroup("/api/v1/trading")
+    .RequireAuthorization();
+
+tradingGroup.MapPost("/buy", async (
+    TradeStockRequest request,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new BuyStockCommand(userId, request.StockId, request.Quantity), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        tradeId = result.Value.TradeId,
+        unitPrice = result.Value.UnitPrice,
+        totalAmount = result.Value.TotalAmount,
+        status = "Completed"
+    });
+});
+
+tradingGroup.MapPost("/sell", async (
+    TradeStockRequest request,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new SellStockCommand(userId, request.StockId, request.Quantity), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        tradeId = result.Value.TradeId,
+        unitPrice = result.Value.UnitPrice,
+        totalAmount = result.Value.TotalAmount,
+        status = "Completed"
+    });
+});
+
+tradingGroup.MapGet("/history", async (
+    int? page,
+    int? pageSize,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetTradeHistoryQuery(userId, page ?? 1, pageSize ?? 25), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { items = result.Value.Items });
+});
+
+var portfolioGroup = app.MapGroup("/api/v1/portfolio")
+    .RequireAuthorization();
+
+portfolioGroup.MapGet("", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetPortfolioSummaryQuery(userId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        currentValue = result.Value.CurrentValue,
+        costBasis = result.Value.CostBasis,
+        profitLoss = result.Value.ProfitLoss,
+        holdings = result.Value.Holdings
+    });
+});
+
+portfolioGroup.MapGet("/holdings", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetHoldingsQuery(userId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { items = result.Value.Items });
+});
 
 var adminGroup = app.MapGroup("/api/v1/admin")
     .RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
@@ -253,6 +385,22 @@ app.MapHangfireDashboard("/hangfire");
 
 app.Run();
 
+static bool TryResolveUserId(ClaimsPrincipal principal, out Guid userId)
+{
+    var userIdValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    return Guid.TryParse(userIdValue, out userId);
+}
+
+static Microsoft.AspNetCore.Http.IResult UnauthorizedResult(HttpContext httpContext)
+{
+    return Results.Json(new
+    {
+        code = "UNAUTHORIZED",
+        message = "Authentication token is missing a valid user identifier.",
+        traceId = httpContext.TraceIdentifier
+    }, statusCode: StatusCodes.Status401Unauthorized);
+}
+
 static string? ResolveActor(ClaimsPrincipal principal)
 {
     return principal.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -261,7 +409,11 @@ static string? ResolveActor(ClaimsPrincipal principal)
 }
 
 public sealed record AddTrackedPlayerRequest(long OsuUserId, TrackingTier TrackingTier = TrackingTier.Tier3);
+public sealed record TradeStockRequest(Guid StockId, int Quantity);
 
 public partial class Program
 {
 }
+
+
+
