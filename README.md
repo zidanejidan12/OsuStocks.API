@@ -1,14 +1,30 @@
 # OsuStocks.API
 
-Backend service for the osu! Stocks game platform. This repository currently contains the Clean Architecture foundation, persistence layer, and the Osu Integration authentication and synchronization skeleton.
+Backend service for the osu! Stocks game platform.
+
+This repository uses a modular monolith with Clean Architecture and vertical slices. Current implementation includes authentication, player registry, synchronization, trading, portfolio, and market engine foundations.
 
 ## Current Status
 
-- Implemented: solution skeleton (Api, Application, Domain, Infrastructure, Worker, Shared)
-- Implemented: EF Core + PostgreSQL mappings and initial migration
-- Implemented: Redis cache wiring, Hangfire wiring, MediatR, FluentValidation, Mapster
-- Implemented: Osu OAuth login/callback flow and user profile endpoint
-- Not implemented yet: market engine, trading, wallet, and other gameplay business logic
+Implemented modules:
+
+- Solution skeleton: `Api`, `Application`, `Domain`, `Infrastructure`, `Worker`, `Shared`
+- Persistence: EF Core + PostgreSQL mappings and initial migration
+- Infrastructure wiring: Redis cache, Hangfire, MediatR, FluentValidation, Mapster, Swagger
+- Authentication: osu OAuth login/callback + JWT issuance + `/auth/me`
+- Player Registry: add/list/search/enable/disable tracked players
+- Synchronization: tracked-player snapshot sync + market event persistence
+- Trading: buy/sell/history
+- Portfolio: holdings and portfolio summary
+- Market Engine:
+  - Inputs: `BuyOrderExecuted`, `SellOrderExecuted`, `TopPlayDetected`, `PpIncreased`, `PlayerInactive`
+  - Output: `PriceChanged`
+  - Coefficient-based pricing + price floor + stock price history recording
+
+Planned / partial:
+
+- Full market read endpoints (`/market/*`) from API spec are not fully exposed yet.
+- Wallet dedicated API endpoints (`/wallet`, `/wallet/transactions`) are still pending.
 
 ## Tech Stack
 
@@ -35,6 +51,7 @@ Backend service for the osu! Stocks game platform. This repository currently con
 |-- docs/
 |   |-- ARCHITECTURE.md
 |   |-- API_SPEC.md
+|   |-- BACKEND_ACCEPTANCE_TESTS.md
 |   |-- BUSINESS_RULES.md
 |   |-- CODING_STANDARDS.md
 |   |-- DATABASE.md
@@ -43,11 +60,14 @@ Backend service for the osu! Stocks game platform. This repository currently con
 |   `-- USE_CASES.md
 |-- src/
 |   |-- Api/            # Minimal API endpoints, auth, Swagger, Hangfire dashboard
-|   |-- Application/    # CQRS handlers, validators, pipeline behaviors, abstractions
-|   |-- Domain/         # Entities, enums, repository contracts, domain interfaces/events
-|   |-- Infrastructure/ # EF Core, repositories, OAuth/Osu API clients, token storage
+|   |-- Application/    # CQRS handlers, validators, behaviors, event handlers
+|   |-- Domain/         # Entities, enums, repository contracts, domain services/events
+|   |-- Infrastructure/ # EF Core, repositories, OAuth/Osu API clients, options providers
 |   |-- Worker/         # Background host with Hangfire server enabled
-|   `-- Shared/         # Shared contracts/helpers (currently minimal)
+|   `-- Shared/         # Shared contracts/helpers
+|-- tests/
+|   |-- OsuStocks.Api.IntegrationTests/
+|   `-- OsuStocks.Application.UnitTests/
 |-- OsuStocks.sln
 `-- README.md
 ```
@@ -68,6 +88,17 @@ Key sections:
 - `OsuOAuth:*`
 - `OsuApi:BaseUrl`
 - `Jwt:*`
+- `MarketEngine:*`
+
+`MarketEngine` keys:
+
+- `TradeBuyImpactPerShare`
+- `TradeSellImpactPerShare`
+- `TopPlayImpact`
+- `PpImpactPerPoint`
+- `MaxPpImpact`
+- `InactivityDecayImpact`
+- `PriceFloor`
 
 Do not commit secrets. Use user-secrets for local development:
 
@@ -77,7 +108,7 @@ dotnet user-secrets set --project src/Api/OsuStocks.Api.csproj "OsuOAuth:ClientS
 dotnet user-secrets set --project src/Api/OsuStocks.Api.csproj "Jwt:SigningKey" "<min-32-char-random-secret>"
 ```
 
-Important: `OsuOAuth:RedirectUri` must exactly match the callback URL registered in your osu! OAuth app.
+Important: `OsuOAuth:RedirectUri` must exactly match the callback URL registered in your osu OAuth app.
 
 ## Run Locally
 
@@ -115,40 +146,66 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 
 6. Open tools:
 
-- Swagger UI: `http://localhost:5152/swagger` (or HTTPS profile URL)
-- Hangfire Dashboard: `http://localhost:5152/hangfire`
+- Swagger UI: `http://localhost:5065/swagger` (or the URL shown in startup logs)
+- Hangfire Dashboard: `http://localhost:5065/hangfire`
 - Health: `GET /api/v1/health`
 
-## OAuth Flow Notes
+## API Coverage (Current)
 
-- `GET /api/v1/auth/login?returnUrl=http://localhost:3000/dashboard` returns an HTTP redirect to osu! authorization.
-- In Swagger Try it out, redirect endpoints can show browser fetch/CORS style errors. Use direct browser navigation for login redirect tests.
-- After osu callback, API returns app JWT (`accessToken`, `expiresAt`, `returnUrl`).
+Implemented route groups:
+
+- `/api/v1/auth`
+- `/api/v1/admin/tracked-players`
+- `/api/v1/trading`
+- `/api/v1/portfolio`
+- `/api/v1/health`
+
+Not fully implemented yet from `docs/API_SPEC.md`:
+
+- `/api/v1/market/*`
+- `/api/v1/wallet*`
+- `/api/v1/leaderboards*`
+
+## Testing
+
+Run all tests:
+
+```powershell
+dotnet test OsuStocks.sln
+```
+
+Run key focused suites:
+
+```powershell
+dotnet test tests/OsuStocks.Application.UnitTests/OsuStocks.Application.UnitTests.csproj --filter "MarketPriceEngineTests|MarketEventProcessingServiceTests"
+dotnet test tests/OsuStocks.Api.IntegrationTests/OsuStocks.Api.IntegrationTests.csproj --filter "TradingEndpointsTests|PortfolioEndpointsTests|OAuthCallbackEndpointsTests"
+```
+
+## QA Acceptance Checklist
+
+Use this document for milestone verification without reading source code:
+
+- `docs/BACKEND_ACCEPTANCE_TESTS.md`
 
 ## Contribution Guide
 
-1. Read and follow all documents in `docs/`, especially:
+1. Read all docs in `docs/` before coding, especially:
    - `docs/ARCHITECTURE.md`
    - `docs/CODING_STANDARDS.md`
    - `docs/API_SPEC.md`
-2. Keep Clean Architecture boundaries strict:
-   - Domain has no framework dependencies.
-   - Application contains use-case orchestration, not business invariants.
-   - Infrastructure implements contracts and external integrations.
-3. Use the vertical-slice approach for new features:
+2. Keep Clean Architecture boundaries strict.
+3. Follow vertical-slice implementation style:
    - Command/Query
    - Handler
    - Validator
    - Endpoint
-4. Use MediatR + FluentValidation + Result pattern for new use cases.
+4. Use MediatR + FluentValidation + Result pattern for use cases.
 5. For DB changes:
-   - Update entity/configuration in Infrastructure.
-   - Add migration in `src/Infrastructure/Persistence/Migrations`.
-6. Before opening a PR, run:
+   - Update entities/configurations
+   - Add migration in `src/Infrastructure/Persistence/Migrations`
+6. Before PR:
 
 ```powershell
 dotnet build OsuStocks.sln
 dotnet test OsuStocks.sln
 ```
-
-Note: test projects are not scaffolded yet, so `dotnet test` may report no tests discovered at this stage.
