@@ -4,6 +4,7 @@ using OsuStocks.Domain.OsuIntegration.Models;
 using OsuStocks.Infrastructure.OsuIntegration.Options;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace OsuStocks.Infrastructure.OsuIntegration.OAuth;
 
@@ -124,9 +125,16 @@ internal sealed class OsuOAuthService(HttpClient httpClient, IOptions<OsuOAuthOp
 
     private sealed class OsuTokenResponse
     {
+        [JsonPropertyName("access_token")]
         public string AccessToken { get; init; } = string.Empty;
+
+        [JsonPropertyName("refresh_token")]
         public string? RefreshToken { get; init; }
+
+        [JsonPropertyName("expires_in")]
         public int ExpiresIn { get; init; }
+
+        [JsonPropertyName("scope")]
         public string Scope { get; init; } = string.Empty;
     }
 }
