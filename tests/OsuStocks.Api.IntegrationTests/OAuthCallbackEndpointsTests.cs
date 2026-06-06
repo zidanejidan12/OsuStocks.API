@@ -138,6 +138,27 @@ public sealed class OAuthCallbackEndpointsTests
         Assert.Equal("oauth-user-token", savedToken.AccessToken);
     }
 
+
+    [Fact]
+    public async Task Callback_WithUnknownReturnUrlInState_ReturnsForbidden()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var tokenManager = scope.ServiceProvider.GetRequiredService<IOsuTokenManager>();
+
+        const string state = "oauth-state-unknown-return-url";
+        await tokenManager.StoreAuthorizationStateAsync(state, "https://evil.example/redirect", TimeSpan.FromMinutes(5));
+
+        var response = await client.GetAsync($"/api/v1/auth/callback?code=valid-code&state={state}");
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("FORBIDDEN", payload.Code);
+    }
     private static ClaimsPrincipal ValidateJwt(string accessToken)
     {
         var handler = new JwtSecurityTokenHandler();
@@ -158,8 +179,14 @@ public sealed class OAuthCallbackEndpointsTests
             out _);
     }
 
+    private sealed record ErrorResponse(
+        [property: JsonPropertyName("code")] string Code,
+        [property: JsonPropertyName("message")] string Message,
+        [property: JsonPropertyName("traceId")] string TraceId);
+
     private sealed record CallbackResponse(
         [property: JsonPropertyName("accessToken")] string AccessToken,
         [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt,
         [property: JsonPropertyName("returnUrl")] string? ReturnUrl);
 }
+

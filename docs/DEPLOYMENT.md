@@ -39,6 +39,14 @@ When `ASPNETCORE_ENVIRONMENT=Production`:
 
 This fail-fast behavior prevents accidental deployment with insecure defaults.
 
+## OAuth Return URL Allow-List
+
+Configure trusted frontend origins for `GET /api/v1/auth/login?returnUrl=...`:
+
+- `Security:OAuthReturnUrl:AllowedOrigins` accepts absolute origins (scheme + host + optional port).
+- Unknown origins are rejected with `400 VALIDATION_ERROR`.
+- `localhost` loopback origins are accepted only in `Development`.
+
 ## Example (PowerShell)
 
 API:
@@ -75,3 +83,4 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 - Keep `Security__EnableSwagger` unset in production unless there is a temporary operational need.
 - Restrict Admin role assignment carefully; it now governs Hangfire dashboard access.
 - Use TLS termination and forward HTTPS correctly so `Request.IsHttps` remains true for dashboard access.
+
