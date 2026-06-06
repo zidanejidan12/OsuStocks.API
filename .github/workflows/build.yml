@@ -1,0 +1,40 @@
+name: Build & Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore OsuStocks.sln
+
+      - name: Build
+        run: dotnet build OsuStocks.sln --no-restore -c Release
+
+      - name: Unit Tests
+        run: dotnet test tests/OsuStocks.Application.UnitTests/OsuStocks.Application.UnitTests.csproj --no-build -c Release --logger trx --results-directory TestResults
+
+      - name: Integration Tests
+        run: dotnet test tests/OsuStocks.Api.IntegrationTests/OsuStocks.Api.IntegrationTests.csproj --no-build -c Release --logger trx --results-directory TestResults
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: true
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/*.trx

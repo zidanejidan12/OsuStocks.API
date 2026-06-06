@@ -21,5 +21,10 @@ public sealed class OsuSynchronizationRecurringJobRegistrar(IRecurringJobManager
             "osu-sync-tier3",
             job => job.RunTier3Async(),
             "*/15 * * * *");
+
+        recurringJobManager.AddOrUpdate<InactivityDecayRecurringJob>(
+            "inactivity-decay",
+            job => job.RunAsync(),
+            Cron.Daily(3, 0));
     }
 }

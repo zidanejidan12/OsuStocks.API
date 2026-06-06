@@ -38,6 +38,15 @@ internal sealed class InMemoryHoldingRepository : IHoldingRepository
         return Task.FromResult<IReadOnlyList<Holding>>(holdings);
     }
 
+    public Task<int> GetTotalQuantityByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
+    {
+        var total = _holdingsById.Values
+            .Where(x => x.StockId == stockId)
+            .Sum(x => x.Quantity);
+
+        return Task.FromResult(total);
+    }
+
     public Task AddAsync(Holding holding, CancellationToken cancellationToken = default)
     {
         _holdingsById[holding.Id] = Clone(holding)!;

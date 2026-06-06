@@ -8,4 +8,8 @@ public interface IPlayerSnapshotRepository
     Task<PlayerSnapshot?> GetLatestByTrackedPlayerIdAsync(
         Guid trackedPlayerId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestByTrackedPlayerIdsAsync(
+        IReadOnlyCollection<Guid> trackedPlayerIds,
+        CancellationToken cancellationToken = default);
 }

@@ -28,6 +28,24 @@ internal sealed class InMemoryTradeRepository : ITradeRepository
         return Task.FromResult<IReadOnlyList<Trade>>(items);
     }
 
+    public Task<Trade?> GetLastByUserAndStockAsync(Guid userId, Guid stockId, CancellationToken cancellationToken = default)
+    {
+        var trade = _tradesById.Values
+            .Where(x => x.UserId == userId && x.StockId == stockId)
+            .OrderByDescending(x => x.ExecutedAt)
+            .FirstOrDefault();
+
+        return Task.FromResult(Clone(trade));
+    }
+
+    public Task<int> CountRecentByUserAsync(Guid userId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var count = _tradesById.Values
+            .Count(x => x.UserId == userId && x.ExecutedAt >= since);
+
+        return Task.FromResult(count);
+    }
+
     private static Trade? Clone(Trade? trade)
     {
         if (trade is null)

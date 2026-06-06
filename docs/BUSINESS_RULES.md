@@ -108,15 +108,17 @@ Demand score influences future price movement.
 
 ## BR-015 Daily Decay
 
-If player has no positive performance activity:
+If a tracked player's latest snapshot is older than the inactivity threshold:
 
-Apply decay.
+Apply decay via `PlayerInactive` event.
 
-Default:
+Default threshold: 7 days (configurable via `MarketEngine:InactivityThresholdDays`).
 
--0.5% daily
+Decay impact: -0.5% per evaluation (configurable via `MarketEngine:InactivityDecayImpact`).
 
-Admin configurable.
+Evaluated once daily by the `inactivity-decay` recurring job (runs at 03:00 UTC).
+
+The existing `PlayerInactiveEventHandler` applies the price change through the market engine.
 
 ---
 
@@ -124,11 +126,11 @@ Admin configurable.
 
 Definition:
 
-No PP gain for 14 consecutive days.
+No snapshot activity for the configured inactivity threshold (default: 7 days).
 
 Effect:
 
-Additional decay applied.
+`PlayerInactive` event published, triggering decay through the market engine's coefficient-based pricing.
 
 ---
 
@@ -186,19 +188,45 @@ One osu! account equals one game account.
 
 ---
 
-## BR-041 Self-Trading Prevention
+## BR-041 Self-Trading Prevention / Trade Cooldown
 
-Users may not execute invalid trades designed solely to manipulate volume.
+A per-stock trade cooldown prevents rapid buy-sell cycling on the same stock.
 
-Suspicious patterns are logged.
+Default: 30 seconds (configurable via `AntiAbuse:TradeCooldownSeconds`).
+
+Applies to both buy and sell operations per user per stock.
+
+Violations are logged as structured warnings and return `TRADE_COOLDOWN` error.
 
 ---
 
 ## BR-042 Market Manipulation Monitoring
 
-Repeated circular trading patterns should be flagged.
+### Position Limit
 
-Administrator review required.
+Users may not accumulate more than a configurable percentage of a stock's total supply.
+
+Default: 25% (configurable via `AntiAbuse:MaxOwnershipPercentage`).
+
+Exceeding the limit returns `POSITION_LIMIT_EXCEEDED` error.
+
+Position limit is not enforced when total supply is zero (first buyer).
+
+### Rapid Trading Detection
+
+When a user executes more trades than a configurable threshold within a time window, a structured warning is logged for administrator review.
+
+Default: 10 trades within 300 seconds (configurable via `AntiAbuse:RapidTradeThreshold` and `AntiAbuse:RapidTradeWindowSeconds`).
+
+Rapid trading detection is non-blocking (audit only).
+
+### Audit Logging
+
+All violations and suspicious patterns produce structured log entries with:
+
+- `UserId`, `StockId`
+- Violation type and parameters
+- Timestamps and thresholds
 
 ---
 

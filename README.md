@@ -2,29 +2,32 @@
 
 Backend service for the osu! Stocks game platform.
 
-This repository uses a modular monolith with Clean Architecture and vertical slices. Current implementation includes authentication, player registry, synchronization, trading, portfolio, and market engine foundations.
+This repository uses a modular monolith with Clean Architecture and vertical slices. Current implementation includes authentication, player registry, synchronization, trading, portfolio, market engine, and admin management.
 
 ## Current Status
 
 Implemented modules:
 
 - Solution skeleton: `Api`, `Application`, `Domain`, `Infrastructure`, `Worker`, `Shared`
-- Persistence: EF Core + PostgreSQL mappings and initial migration
+- Persistence: EF Core + PostgreSQL mappings and migrations
 - Infrastructure wiring: Redis cache, Hangfire, MediatR, FluentValidation, Mapster, Swagger
 - Authentication: osu OAuth login/callback + JWT issuance + `/auth/me`
 - Player Registry: add/list/search/enable/disable tracked players
-- Synchronization: tracked-player snapshot sync + market event persistence
-- Trading: buy/sell/history
+- Synchronization: tracked-player snapshot sync + market event persistence (tiered: 1m/5m/15m)
+- Trading: buy/sell/history with maintenance mode guard
 - Portfolio: holdings and portfolio summary
+- Wallet: balance and transaction ledger
 - Market Engine:
   - Inputs: `BuyOrderExecuted`, `SellOrderExecuted`, `TopPlayDetected`, `PpIncreased`, `PlayerInactive`
   - Output: `PriceChanged`
   - Coefficient-based pricing + price floor + stock price history recording
+- Admin: market settings management (multipliers + maintenance mode toggle)
+- Security: CORS, rate limiting, global exception handler, concurrency conflict handling (HTTP 409), anti-abuse (trade cooldown, position limits, rapid trading detection)
+- Deployment: Docker (API + Worker + PostgreSQL + Redis + nginx)
 
-Planned / partial:
+Postponed (Phase 1.5):
 
-- Leaderboards are postponed to Phase 1.5 (`/leaderboards/*`).
-- Market maintenance mode is postponed to Phase 1.5.
+- Leaderboards (`/leaderboards/*`)
 
 ## Tech Stack
 
@@ -35,13 +38,14 @@ Planned / partial:
 - MediatR + FluentValidation
 - Mapster
 - Swagger (Swashbuckle)
+- Docker + nginx
 
 ## Requirements
 
 - .NET SDK 9.0+
 - PostgreSQL 16+ (or compatible)
 - Redis 7+
-- Docker Desktop (optional but recommended for local infra)
+- Docker Desktop (recommended for local infra and deployment)
 - An osu! OAuth application (client id and client secret)
 
 ## Project Structure
@@ -57,6 +61,7 @@ Planned / partial:
 |   |-- DATABASE.md
 |   |-- DEPLOYMENT.md
 |   |-- DOMAIN_MODEL.md
+|   |-- OPERATIONS.md
 |   |-- ROADMAP.md
 |   `-- USE_CASES.md
 |-- src/
@@ -69,6 +74,8 @@ Planned / partial:
 |-- tests/
 |   |-- OsuStocks.Api.IntegrationTests/
 |   `-- OsuStocks.Application.UnitTests/
+|-- nginx/              # Reverse proxy configuration
+|-- docker-compose.yml  # Full stack deployment
 |-- OsuStocks.sln
 `-- README.md
 ```
@@ -90,6 +97,8 @@ Key sections:
 - `OsuApi:BaseUrl`
 - `Jwt:*`
 - `MarketEngine:*`
+- `AntiAbuse:*`
+- `Cors:AllowedOrigins` (array of allowed CORS origins)
 
 `MarketEngine` keys:
 
@@ -99,6 +108,7 @@ Key sections:
 - `PpImpactPerPoint`
 - `MaxPpImpact`
 - `InactivityDecayImpact`
+- `InactivityThresholdDays`
 - `PriceFloor`
 
 Do not commit secrets. Use user-secrets for local development:
@@ -113,14 +123,29 @@ Important: `OsuOAuth:RedirectUri` must exactly match the callback URL registered
 
 ## Production Deployment
 
+### Docker Compose (recommended)
+
+```bash
+# Create .env with production secrets (see docs/DEPLOYMENT.md)
+docker compose up -d --build
+```
+
+Services started: api, worker, postgres, redis, nginx.
+
+See `docs/DEPLOYMENT.md` for full setup, environment variables, and TLS configuration.
+
+### Manual Deployment
+
 Production security hardening is enforced for non-development environments:
 
 - Hangfire dashboard requires authenticated Admin role and HTTPS.
 - Swagger is disabled outside Development by default.
 - JWT metadata requires HTTPS outside Development.
 - Startup validates required production secrets from environment variables.
-
-See `docs/DEPLOYMENT.md` for full setup and environment variable requirements.
+- CORS restricts cross-origin requests to configured origins.
+- Rate limiting protects auth (10 req/min) and trading (30 req/min) endpoints.
+- Global exception handler prevents information leakage.
+- Concurrency conflicts return HTTP 409.
 
 ## Run Locally
 
@@ -166,10 +191,10 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 
 Implemented route groups:
 
-- `/api/v1/auth`
+- `/api/v1/auth` (rate limited: 10 req/min)
 - `/api/v1/market`
 - `/api/v1/market/stocks`
-- `/api/v1/trading`
+- `/api/v1/trading` (rate limited: 30 req/min)
 - `/api/v1/portfolio`
 - `/api/v1/wallet`
 - `/api/v1/admin/tracked-players`
@@ -179,7 +204,6 @@ Implemented route groups:
 Postponed from `docs/API_SPEC.md` (Phase 1.5):
 
 - `/api/v1/leaderboards/*`
-- Market maintenance mode behavior
 
 ## Testing
 
@@ -195,10 +219,28 @@ Integration tests (PostgreSQL Testcontainers):
 - No local PostgreSQL instance is required.
 
 ```powershell
-dotnet test tests/OsuStocks.Api.IntegrationTests/OsuStocks.Api.IntegrationTests.csproj --filter "WalletEndpointsTests|TradingEndpointsTests|PortfolioEndpointsTests|MarketEngineIntegrationTests"
+dotnet test tests/OsuStocks.Api.IntegrationTests/OsuStocks.Api.IntegrationTests.csproj
 ```
 
-CI setup is included in `.github/workflows/integration-tests.yml`.
+## CI/CD
+
+GitHub Actions workflows in `.github/workflows/`:
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| `build.yml` | Push to `main`, PRs | Restore, build, unit tests, integration tests |
+| `docker.yml` | Push to `main`, PRs (src changes) | Build API and Worker Docker images |
+| `release.yml` | Tag `v*` | Publish production artifacts, push images to GHCR |
+
+Release a new version:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This builds production artifacts for both API and Worker, and pushes Docker images to GitHub Container Registry at `ghcr.io/<owner>/PetProject/api` and `ghcr.io/<owner>/PetProject/worker`.
+
 ## QA Acceptance Checklist
 
 Use this document for milestone verification without reading source code:
@@ -227,4 +269,3 @@ Use this document for milestone verification without reading source code:
 dotnet build OsuStocks.sln
 dotnet test OsuStocks.sln
 ```
-

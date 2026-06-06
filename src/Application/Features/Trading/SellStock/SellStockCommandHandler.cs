@@ -2,6 +2,7 @@ using MediatR;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Application.Features.Market.Notifications;
+using OsuStocks.Application.Features.Trading.Services;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Market.Events;
@@ -18,7 +19,8 @@ public sealed class SellStockCommandHandler(
     ITradeRepository tradeRepository,
     IWalletTransactionRepository walletTransactionRepository,
     IApplicationDbContext dbContext,
-    IPublisher publisher)
+    IPublisher publisher,
+    ITradingGuardService tradingGuardService)
     : IRequestHandler<SellStockCommand, Result<SellStockResponse>>
 {
     public async Task<Result<SellStockResponse>> Handle(SellStockCommand request, CancellationToken cancellationToken)
@@ -45,6 +47,13 @@ public sealed class SellStockCommandHandler(
         if (stock is null)
         {
             return Result.Failure<SellStockResponse>("NOT_FOUND", "Stock not found.");
+        }
+
+        var cooldownResult = await tradingGuardService.CheckCooldownAsync(
+            request.UserId, request.StockId, cancellationToken);
+        if (!cooldownResult.IsSuccess)
+        {
+            return Result.Failure<SellStockResponse>(cooldownResult.Error!.Code, cooldownResult.Error.Message);
         }
 
         var holding = await holdingRepository.GetByPortfolioAndStockAsync(portfolio.Id, stock.Id, cancellationToken);
@@ -107,6 +116,8 @@ public sealed class SellStockCommandHandler(
 
         await publisher.Publish(new SellOrderExecutedNotification(
             new SellOrderExecuted(stock.Id, request.Quantity, unitPrice, DateTimeOffset.UtcNow)), cancellationToken);
+
+        await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
         return Result.Success(new SellStockResponse(trade.Id, unitPrice, totalAmount));
     }
