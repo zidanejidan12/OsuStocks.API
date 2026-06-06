@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>osu!Stocks — UI Prototype (hand-off reference)</title>
+<style>
+  /* ============================================================
+     DESIGN TOKENS — share these with the FE dev (CSS vars / Tailwind theme)
+     ============================================================ */
+  :root{
+    --bg:#0e0f13; --surface:#171922; --surface-2:#1e212c; --surface-3:#262a37;
+    --border:#2b2f3c; --border-2:#363b4b;
+    --text:#e9eaf0; --muted:#9aa1b2; --faint:#6b7180;
+    --accent:#ff66aa; --accent-2:#ff8fc1; --accent-dim:#3a1f2e;
+    --green:#37d39b; --green-dim:#10362b; --red:#ff5d6c; --red-dim:#3a1a22;
+    --amber:#ffb454; --blue:#5aa9ff;
+    --radius:14px; --radius-sm:9px;
+    --shadow:0 10px 30px rgba(0,0,0,.45);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--accent);color:#1a0a12}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:20px}
+
+  .ep{font-family:var(--mono);font-size:11px;color:var(--accent-2);background:var(--accent-dim);
+      border:1px solid #4a2638;padding:2px 8px;border-radius:20px;white-space:nowrap;display:inline-block}
+  .ep.get{color:#9ad7ff;background:#142433;border-color:#23405a}
+  .ep.post{color:#ffd08a;background:#332813;border-color:#5a4423}
+  .ep.put,.ep.patch{color:#c9a6ff;background:#241a38;border-color:#3f2d5e}
+
+  /* ============================ APP SHELL ============================ */
+  .app{display:grid;grid-template-columns:232px 1fr;height:100vh;overflow:hidden}
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:18px 14px}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#ff3d8a);
+      display:grid;place-items:center;font-weight:800;color:#180810;font-size:18px}
+  .brand b{font-size:16px;letter-spacing:.2px}
+  .brand b span{color:var(--accent)}
+  .navlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);padding:14px 10px 6px;font-weight:600}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;color:var(--muted);font-weight:500;cursor:pointer;transition:.12s}
+  .nav a .ico{width:18px;text-align:center;opacity:.9}
+  .nav a:hover{background:var(--surface-2);color:var(--text)}
+  .nav a.active{background:var(--accent-dim);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+  .nav a.active .ico{filter:drop-shadow(0 0 6px var(--accent))}
+  .usercard{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+  .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ff8fc1,#7c5cff);flex:0 0 auto}
+  .usercard .meta{min-width:0}
+  .usercard .meta b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .usercard .meta span{font-size:11px;color:var(--faint)}
+  .role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-2);border:1px solid #4a2638;border-radius:5px;padding:1px 5px;margin-left:4px}
+
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:1px solid var(--border);background:rgba(14,15,19,.7);backdrop-filter:blur(8px)}
+  .topbar h1{font-size:19px;margin:0;font-weight:700}
+  .topbar .sub{color:var(--faint);font-size:12.5px}
+  .spacer{flex:1}
+  .balance-pill{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:30px;padding:7px 14px;font-weight:600}
+  .balance-pill .c{color:var(--accent)}
+  .search{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;min-width:240px;color:var(--muted)}
+  .search input{background:none;border:none;outline:none;color:var(--text);width:100%;font-size:13px}
+  .content{padding:24px 26px;overflow-y:auto}
+  .screen{display:none;animation:fade .25s ease}
+  .screen.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ============================ PRIMITIVES ============================ */
+  .row{display:flex;gap:18px}
+  .grid{display:grid;gap:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+  .card h3{margin:0 0 2px;font-size:13px;color:var(--muted);font-weight:600}
+  .stat{font-size:26px;font-weight:760;letter-spacing:-.5px}
+  .muted{color:var(--muted)} .faint{color:var(--faint)} .mono{font-family:var(--mono)}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .chg{font-weight:650;font-size:12.5px;padding:2px 7px;border-radius:6px}
+  .chg.up{color:var(--green);background:var(--green-dim)} .chg.down{color:var(--red);background:var(--red-dim)}
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);
+       padding:9px 15px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;transition:.12s}
+  .btn:hover{border-color:var(--accent);color:#fff}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#ff3d8a);border:none;color:#1a0a12}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.green{background:var(--green);border:none;color:#04231a}
+  .btn.red{background:transparent;border-color:#5a2730;color:var(--red)}
+  .btn.sm{padding:6px 11px;font-size:12px}
+  .btn.ghost{background:transparent}
+  .badge{font-size:11px;font-weight:650;padding:3px 9px;border-radius:20px;border:1px solid var(--border-2);color:var(--muted)}
+  .badge.tier1{color:#ffd08a;border-color:#5a4423;background:#2a2110}
+  .badge.tier2{color:#9ad7ff;border-color:#23405a;background:#13242f}
+  .badge.tier3{color:var(--muted)}
+  .badge.on{color:var(--green);border-color:#1c5040;background:var(--green-dim)}
+  .badge.off{color:var(--faint);background:#1a1c24}
+  .badge.buy{color:var(--green);border-color:#1c5040;background:var(--green-dim)}
+  .badge.sell{color:var(--red);border-color:#5a2730;background:var(--red-dim)}
+  .section-head{display:flex;align-items:center;gap:12px;margin:0 0 14px}
+  .section-head h2{font-size:16px;margin:0}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+  th .ar{opacity:.5;font-size:9px}
+  td{padding:13px 14px;border-bottom:1px solid var(--border)}
+  tbody tr{transition:.1s;cursor:pointer}
+  tbody tr:hover{background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:none}
+  .player{display:flex;align-items:center;gap:10px}
+  .pav{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#7c5cff,#ff8fc1);flex:0 0 auto;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
+  .pager{display:flex;align-items:center;justify-content:space-between;padding:13px 6px 2px;color:var(--muted);font-size:12.5px}
+  .pager .pg{display:flex;gap:6px}
+  .pg button{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);cursor:pointer}
+  .pg button.active{background:var(--accent-dim);color:#fff;border-color:var(--accent)}
+
+  /* tabs / toolbar */
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px}
+  .seg button{border:none;background:none;color:var(--muted);padding:6px 12px;border-radius:7px;font-weight:600;font-size:12.5px;cursor:pointer}
+  .seg button.active{background:var(--surface-3);color:#fff}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(6,7,10,.66);backdrop-filter:blur(3px);display:none;place-items:center;z-index:50}
+  .modal-bg.open{display:grid}
+  .modal{width:430px;max-width:94vw;background:var(--surface);border:1px solid var(--border-2);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;animation:pop .2s}
+  @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+  .modal header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border)}
+  .modal header b{font-size:16px}
+  .modal .body{padding:20px}
+  .modal .x{cursor:pointer;color:var(--faint);font-size:20px;line-height:1}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+  .input{width:100%;background:var(--surface-2);border:1px solid var(--border-2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;font-family:inherit}
+  .input:focus{border-color:var(--accent)}
+  .qty{display:flex;align-items:center;gap:0}
+  .qty button{width:42px;height:44px;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);font-size:18px;cursor:pointer}
+  .qty button:first-child{border-radius:10px 0 0 10px} .qty button:last-child{border-radius:0 10px 10px 0}
+  .qty input{flex:1;text-align:center;border-radius:0;border-left:none;border-right:none}
+  .summ{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:16px 0}
+  .summ .l{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+  .summ .l b{font-size:15px}
+  .meter{height:7px;border-radius:5px;background:var(--surface-3);overflow:hidden;margin-top:7px}
+  .meter > i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--amber))}
+
+  /* toast */
+  .toasts{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:10px;z-index:60}
+  .toast{display:flex;gap:11px;align-items:flex-start;background:var(--surface);border:1px solid var(--border-2);border-left:3px solid var(--red);border-radius:12px;padding:13px 15px;width:330px;box-shadow:var(--shadow)}
+  .toast.ok{border-left-color:var(--green)} .toast.warn{border-left-color:var(--amber)}
+  .toast b{font-size:13px} .toast .code{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+
+  /* chart */
+  .chart{width:100%;height:200px}
+  .chart .grid line{stroke:var(--border);stroke-width:1}
+  .chart .area{fill:url(#g);opacity:.5}
+  .chart .line{fill:none;stroke:var(--accent);stroke-width:2.5}
+  .chart .dot{fill:var(--accent)}
+
+  .empty{text-align:center;padding:48px 20px;color:var(--faint)}
+  .empty .big{font-size:40px;opacity:.5;margin-bottom:8px}
+  .note{font-size:12px;color:var(--faint);background:var(--surface-2);border:1px dashed var(--border-2);border-radius:10px;padding:10px 13px;margin-bottom:16px}
+  .toggle{position:relative;width:46px;height:26px;border-radius:20px;background:var(--surface-3);border:1px solid var(--border-2);cursor:pointer;transition:.15s}
+  .toggle.on{background:var(--accent-dim);border-color:var(--accent)}
+  .toggle i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:.15s}
+  .toggle.on i{left:22px;background:var(--accent)}
+
+  /* login screen */
+  .login{position:fixed;inset:0;display:none;place-items:center;background:radial-gradient(1200px 600px at 70% -10%,#2a1322,transparent),var(--bg);z-index:80}
+  .login.open{display:grid}
+  .login .box{width:380px;text-align:center;background:var(--surface);border:1px solid var(--border-2);border-radius:20px;padding:40px 34px;box-shadow:var(--shadow)}
+  .login .logo{width:60px;height:60px;border-radius:16px;margin:0 auto 18px;background:linear-gradient(135deg,var(--accent),#ff3d8a);display:grid;place-items:center;font-size:30px;font-weight:800;color:#180810}
+  .login h2{margin:0 0 6px} .login p{color:var(--muted);margin:0 0 26px;font-size:13px}
+  .login .osu{width:100%;justify-content:center;padding:13px;font-size:15px}
+  .floatbar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;background:var(--surface);border:1px solid var(--border-2);border-radius:30px;padding:7px 10px;z-index:40;box-shadow:var(--shadow)}
+  .floatbar span{font-size:11px;color:var(--faint);padding:6px 4px 6px 10px}
+  .floatbar button{border:none;background:var(--surface-2);color:var(--muted);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .floatbar button:hover{color:#fff;background:var(--surface-3)}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN (overlay) ===================== -->
+<div class="login" id="loginScreen">
+  <div class="box">
+    <div class="logo">!</div>
+    <h2>osu!<span style="color:var(--accent)">Stocks</span></h2>
+    <p>Trade shares of your favourite osu! players. Sign in with your osu! account to start.</p>
+    <button class="btn primary osu" onclick="closeLogin()">
+      <span style="font-size:18px">🌸</span> Sign in with osu!
+    </button>
+    <div class="note" style="margin-top:22px;text-align:left">
+      <b style="color:var(--accent-2)">FE flow:</b> navigate the <em>browser window</em> (not fetch) to
+      <span class="ep get">GET /api/v1/auth/login?returnUrl=…</span> → 302 to osu! → callback returns
+      <code>{ accessToken, expiresAt, returnUrl }</code>. Store token, send as <code>Authorization: Bearer</code>.
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL ===================== -->
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">!</div><b>osu!<span>Stocks</span></b></div>
+    <div class="navlabel">Trade</div>
+    <nav class="nav">
+      <a class="active" data-go="market"><span class="ico">📈</span> Market</a>
+      <a data-go="portfolio"><span class="ico">💼</span> Portfolio</a>
+      <a data-go="wallet"><span class="ico">👛</span> Wallet</a>
+      <a data-go="history"><span class="ico">🧾</span> Trade History</a>
+    </nav>
+    <div class="navlabel">Admin <span class="role">Admin only</span></div>
+    <nav class="nav">
+      <a data-go="players"><span class="ico">🎯</span> Tracked Players</a>
+      <a data-go="settings"><span class="ico">⚙️</span> Market Settings</a>
+    </nav>
+    <div class="usercard">
+      <div class="avatar"></div>
+      <div class="meta"><b>Cookiezi <span class="role">Admin</span></b><span>osu! #4787150</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Market</h1>
+        <div class="sub" id="pageEp"><span class="ep get">GET /api/v1/market</span> <span class="ep get">GET /api/v1/market/stocks</span></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="search" id="topSearch"><span>🔍</span><input placeholder="Search players…"></div>
+      <div class="balance-pill">👛 <span class="c">¢ 8,500.00</span></div>
+      <div class="avatar" style="width:36px;height:36px"></div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============ MARKET ============ -->
+      <section class="screen active" id="market">
+        <div class="note">Overview cards ← <span class="ep get">GET /api/v1/market</span> &nbsp;·&nbsp; table ← <span class="ep get">GET /api/v1/market/stocks?page&pageSize&sort&search</span></div>
+        <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+          <div class="card"><h3>Total Stocks</h3><div class="stat">8</div></div>
+          <div class="card"><h3>Total Volume</h3><div class="stat">39 <span class="muted" style="font-size:14px">shares</span></div></div>
+          <div class="card">
+            <h3>Top Gainer ▲</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+              <div class="player"><div class="pav">m</div><div><b>mrekk</b><div class="faint mono" style="font-size:11px">¢192.78</div></div></div>
+              <span class="chg up">+10.0%</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Top Loser ▼</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+              <div class="player"><div class="pav" style="background:linear-gradient(135deg,#555,#888)">A</div><div><b>Aricin</b><div class="faint mono" style="font-size:11px">¢25.00</div></div></div>
+              <span class="chg down">0.0%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:6px 6px 14px">
+          <div class="toolbar" style="padding:14px 14px 0">
+            <div class="seg">
+              <button class="active">All</button><button>Tier 1</button><button>Tier 2</button><button>Tier 3</button>
+            </div>
+            <div class="spacer"></div>
+            <div class="search" style="min-width:200px"><span>🔍</span><input placeholder="Filter by player name…"></div>
+            <button class="btn sm">Sort: Price ▾</button>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Player <span class="ar">↕</span></th><th>Price <span class="ar">▾</span></th>
+              <th>24h Change <span class="ar">↕</span></th><th>Volume <span class="ar">↕</span></th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav">m</div><b>mrekk</b></div></td><td class="mono">¢192.78</td><td><span class="chg up">+10.0%</span></td><td class="mono muted">8</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav">C</div><b>Cookiezi</b></div></td><td class="mono">¢165.00</td><td><span class="chg up">+10.0%</span></td><td class="mono muted">5</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav">V</div><b>Vaxei</b></div></td><td class="mono">¢130.50</td><td><span class="chg up">+2.0%</span></td><td class="mono muted">4</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#3a7,#6cf)">W</div><b>WhiteCat</b></div></td><td class="mono">¢121.00</td><td><span class="chg up">+10.0%</span></td><td class="mono muted">3</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav">n</div><b>nyanpotato</b></div></td><td class="mono">¢105.33</td><td><span class="chg up">+10.0%</span></td><td class="mono muted">6</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav">l</div><b>lifeline</b></div></td><td class="mono">¢96.80</td><td><span class="chg up">+10.0%</span></td><td class="mono muted">4</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav">R</div><b>RyuK</b></div></td><td class="mono">¢79.75</td><td><span class="chg up">+10.0%</span></td><td class="mono muted">5</td><td style="text-align:right"><button class="btn sm primary" onclick="openTrade(event,'buy')">Trade</button></td></tr>
+              <tr onclick="go('stock')"><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#555,#888)">A</div><b>Aricin</b> <span class="badge off">disabled</span></div></td><td class="mono">¢25.00</td><td><span class="chg down">0.0%</span></td><td class="mono muted">0</td><td style="text-align:right"><button class="btn sm" disabled style="opacity:.4">Trade</button></td></tr>
+            </tbody>
+          </table>
+          <div class="pager">
+            <span>Showing 1–8 of 8 · <code class="faint">totalCount</code></span>
+            <div class="pg"><button>‹</button><button class="active">1</button><button>›</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ STOCK DETAIL ============ -->
+      <section class="screen" id="stock">
+        <div class="note"><span class="ep get">GET /api/v1/market/stocks/{stockId}</span> &nbsp;+&nbsp; <span class="ep get">GET /api/v1/market/stocks/{stockId}/history</span> (bare array)</div>
+        <button class="btn sm ghost" onclick="go('market')" style="margin-bottom:14px">← Back to market</button>
+        <div class="row" style="align-items:stretch">
+          <div class="card" style="flex:2;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+              <div class="pav" style="width:48px;height:48px;font-size:20px">m</div>
+              <div><div style="font-size:22px;font-weight:750">mrekk</div><div class="faint mono" style="font-size:12px">osu! #7562902 · Tier 1</div></div>
+              <div class="spacer"></div>
+              <div style="text-align:right"><div style="font-size:28px;font-weight:780" class="mono">¢192.78</div><span class="chg up">+10.0% · 24h</span></div>
+            </div>
+            <svg class="chart" viewBox="0 0 600 200" preserveAspectRatio="none" style="margin-top:14px">
+              <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff66aa" stop-opacity=".45"/><stop offset="1" stop-color="#ff66aa" stop-opacity="0"/></linearGradient></defs>
+              <g class="grid"><line x1="0" y1="50" x2="600" y2="50"/><line x1="0" y1="100" x2="600" y2="100"/><line x1="0" y1="150" x2="600" y2="150"/></g>
+              <path class="area" d="M0,150 L100,135 L220,120 L340,95 L460,70 L600,30 L600,200 L0,200 Z"/>
+              <path class="line" d="M0,150 L100,135 L220,120 L340,95 L460,70 L600,30"/>
+              <circle class="dot" cx="600" cy="30" r="4"/>
+            </svg>
+            <div class="faint" style="font-size:11px;text-align:center;margin-top:6px">Price history · 6 points (¢120 → ¢192.78)</div>
+          </div>
+          <div class="card" style="flex:1;min-width:280px">
+            <h3>Trade mrekk</h3>
+            <div class="seg" style="margin:10px 0 16px"><button class="active" style="flex:1">Buy</button><button style="flex:1">Sell</button></div>
+            <div class="field"><label>Quantity</label>
+              <div class="qty"><button>−</button><input class="input" value="5"><button>+</button></div>
+            </div>
+            <div class="summ">
+              <div class="l muted"><span>Unit price</span><span class="mono">¢192.78</span></div>
+              <div class="l muted"><span>Quantity</span><span class="mono">× 5</span></div>
+              <div class="l"><b>Total</b><b class="mono">¢963.90</b></div>
+              <div style="margin-top:10px">
+                <div class="l faint" style="font-size:11px"><span>Your ownership after buy</span><span>12% / 25% max</span></div>
+                <div class="meter"><i style="width:48%"></i></div>
+              </div>
+            </div>
+            <button class="btn primary" style="width:100%;justify-content:center" onclick="openTrade(event,'buy')">Review & Buy →</button>
+            <div class="faint" style="font-size:11px;text-align:center;margin-top:10px">⏱ 30s cooldown per stock after each trade</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PORTFOLIO ============ -->
+      <section class="screen" id="portfolio">
+        <div class="note"><span class="ep get">GET /api/v1/portfolio</span> — summary totals + per-holding valuation & P/L</div>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:18px">
+          <div class="card"><h3>Current Value</h3><div class="stat mono">¢1,472.10</div></div>
+          <div class="card"><h3>Cost Basis</h3><div class="stat mono muted">¢1,220.00</div></div>
+          <div class="card"><h3>Total Profit / Loss</h3><div class="stat pos mono">+¢252.10 <span class="chg up" style="font-size:13px">+20.7%</span></div></div>
+        </div>
+        <div class="card" style="padding:6px 6px 8px">
+          <div class="section-head" style="padding:14px 14px 0"><h2>Holdings</h2><span class="faint" style="font-size:12px">3 positions</span></div>
+          <table>
+            <thead><tr><th>Player</th><th>Qty</th><th>Avg Price</th><th>Current</th><th>Cost Basis</th><th>Value</th><th>P/L</th></tr></thead>
+            <tbody>
+              <tr><td><div class="player"><div class="pav">m</div><b>mrekk</b></div></td><td class="mono">5</td><td class="mono muted">¢160.00</td><td class="mono">¢192.78</td><td class="mono muted">¢800.00</td><td class="mono">¢963.90</td><td class="mono pos">+¢163.90</td></tr>
+              <tr><td><div class="player"><div class="pav">l</div><b>lifeline</b></div></td><td class="mono">4</td><td class="mono muted">¢80.00</td><td class="mono">¢96.80</td><td class="mono muted">¢320.00</td><td class="mono">¢387.20</td><td class="mono pos">+¢67.20</td></tr>
+              <tr><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#3a7,#6cf)">W</div><b>WhiteCat</b></div></td><td class="mono">1</td><td class="mono muted">¢100.00</td><td class="mono">¢121.00</td><td class="mono muted">¢100.00</td><td class="mono">¢121.00</td><td class="mono pos">+¢21.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ WALLET ============ -->
+      <section class="screen" id="wallet">
+        <div class="note">Balance ← <span class="ep get">GET /api/v1/wallet</span> &nbsp;·&nbsp; ledger ← <span class="ep get">GET /api/v1/wallet/transactions</span></div>
+        <div class="row" style="margin-bottom:18px">
+          <div class="card" style="flex:1;background:linear-gradient(135deg,#241320,var(--surface))">
+            <h3>Available Balance</h3><div class="stat mono" style="font-size:34px">¢8,500.00</div>
+            <div class="faint" style="font-size:12px;margin-top:4px">Credits · started with ¢10,000 (InitialGrant)</div>
+          </div>
+        </div>
+        <div class="card" style="padding:6px 6px 8px">
+          <div class="section-head" style="padding:14px 14px 0"><h2>Transaction Ledger</h2></div>
+          <table>
+            <thead><tr><th>Type</th><th>Amount</th><th>Reference</th><th>Date</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge sell">SellStock</span></td><td class="mono pos">+¢220.00</td><td class="mono faint">30000…0004</td><td class="muted">May 28, 2026</td></tr>
+              <tr><td><span class="badge buy">BuyStock</span></td><td class="mono neg">−¢320.00</td><td class="mono faint">30000…0003</td><td class="muted">May 23, 2026</td></tr>
+              <tr><td><span class="badge buy">BuyStock</span></td><td class="mono neg">−¢300.00</td><td class="mono faint">30000…0002</td><td class="muted">May 20, 2026</td></tr>
+              <tr><td><span class="badge buy">BuyStock</span></td><td class="mono neg">−¢800.00</td><td class="mono faint">30000…0001</td><td class="muted">May 18, 2026</td></tr>
+              <tr><td><span class="badge" style="color:var(--blue);border-color:#23405a">InitialGrant</span></td><td class="mono pos">+¢10,000.00</td><td class="mono faint">—</td><td class="muted">May 8, 2026</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ TRADE HISTORY ============ -->
+      <section class="screen" id="history">
+        <div class="note"><span class="ep get">GET /api/v1/trading/history?page&pageSize</span> — returns <code>{ items: [...] }</code> (no totalCount)</div>
+        <div class="card" style="padding:6px 6px 8px">
+          <table>
+            <thead><tr><th>Type</th><th>Player</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Executed</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge sell">Sell</span></td><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#3a7,#6cf)">W</div>WhiteCat</div></td><td class="mono">2</td><td class="mono muted">¢110.00</td><td class="mono">¢220.00</td><td class="muted">May 28, 2026</td></tr>
+              <tr><td><span class="badge buy">Buy</span></td><td><div class="player"><div class="pav">l</div>lifeline</div></td><td class="mono">4</td><td class="mono muted">¢80.00</td><td class="mono">¢320.00</td><td class="muted">May 23, 2026</td></tr>
+              <tr><td><span class="badge buy">Buy</span></td><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#3a7,#6cf)">W</div>WhiteCat</div></td><td class="mono">3</td><td class="mono muted">¢100.00</td><td class="mono">¢300.00</td><td class="muted">May 20, 2026</td></tr>
+              <tr><td><span class="badge buy">Buy</span></td><td><div class="player"><div class="pav">m</div>mrekk</div></td><td class="mono">5</td><td class="mono muted">¢160.00</td><td class="mono">¢800.00</td><td class="muted">May 18, 2026</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ ADMIN: TRACKED PLAYERS ============ -->
+      <section class="screen" id="players">
+        <div class="note">List ← <span class="ep get">GET /admin/tracked-players?isActive</span> · enable/disable ← <span class="ep patch">PATCH …/{id}/enable|disable</span> · add ← <span class="ep post">POST /admin/tracked-players</span></div>
+        <div class="toolbar"><div class="section-head" style="margin:0"><h2>Tracked Players</h2><span class="faint" style="font-size:12px">8 tracked</span></div><div class="spacer"></div><button class="btn primary sm" onclick="openModal('addModal')">＋ Add player</button></div>
+        <div class="card" style="padding:6px 6px 8px">
+          <table>
+            <thead><tr><th>Player</th><th>osu! ID</th><th>Tier</th><th>Status</th><th>Tracked Since</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><div class="player"><div class="pav">C</div><b>Cookiezi</b></div></td><td class="mono muted">4787150</td><td><span class="badge tier1">Tier1</span></td><td><span class="badge on">● active</span></td><td class="muted">Apr 8, 2026</td><td style="text-align:right"><button class="btn sm red" onclick="toast('warn','Disabled','Sync paused for Cookiezi')">Disable</button></td></tr>
+              <tr><td><div class="player"><div class="pav">V</div><b>Vaxei</b></div></td><td class="mono muted">6447454</td><td><span class="badge tier1">Tier1</span></td><td><span class="badge on">● active</span></td><td class="muted">Apr 8, 2026</td><td style="text-align:right"><button class="btn sm red">Disable</button></td></tr>
+              <tr><td><div class="player"><div class="pav">m</div><b>mrekk</b></div></td><td class="mono muted">7562902</td><td><span class="badge tier1">Tier1</span></td><td><span class="badge on">● active</span></td><td class="muted">Apr 13, 2026</td><td style="text-align:right"><button class="btn sm red">Disable</button></td></tr>
+              <tr><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#3a7,#6cf)">W</div><b>WhiteCat</b></div></td><td class="mono muted">4504101</td><td><span class="badge tier2">Tier2</span></td><td><span class="badge on">● active</span></td><td class="muted">Apr 18, 2026</td><td style="text-align:right"><button class="btn sm red">Disable</button></td></tr>
+              <tr><td><div class="player"><div class="pav" style="background:linear-gradient(135deg,#555,#888)">A</div><b>Aricin</b></div></td><td class="mono muted">2558286</td><td><span class="badge tier3">Tier3</span></td><td><span class="badge off">● disabled</span></td><td class="muted">Apr 8, 2026</td><td style="text-align:right"><button class="btn sm green" onclick="toast('ok','Enabled','Aricin sync resumed')">Enable</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ ADMIN: MARKET SETTINGS ============ -->
+      <section class="screen" id="settings">
+        <div class="note">Read ← <span class="ep get">GET /admin/market-settings</span> · save ← <span class="ep put">PUT /admin/market-settings</span> (→ 204)</div>
+        <div class="card" style="max-width:560px">
+          <div class="section-head"><h2>Market Engine Settings</h2></div>
+          <div class="field"><label>PP Multiplier <span class="faint">(0–10)</span></label><input class="input mono" value="1.0000"></div>
+          <div class="field"><label>Trade Multiplier <span class="faint">(0–10)</span></label><input class="input mono" value="1.0000"></div>
+          <div class="field"><label>Decay Multiplier <span class="faint">(0–10)</span></label><input class="input mono" value="1.0000"></div>
+          <div class="field" style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:18px">
+            <div><b>Maintenance Mode</b><div class="faint" style="font-size:12px">Blocks all buy/sell — returns <code>MAINTENANCE_MODE</code></div></div>
+            <div class="toggle" onclick="this.classList.toggle('on')"><i></i></div>
+          </div>
+          <button class="btn primary" style="margin-top:18px" onclick="toast('ok','Saved','Market settings updated (204)')">Save settings</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TRADE MODAL ===================== -->
+<div class="modal-bg" id="tradeModal" onclick="if(event.target===this)closeModal('tradeModal')">
+  <div class="modal">
+    <header><b id="tradeTitle">Buy mrekk</b><span class="x" onclick="closeModal('tradeModal')">×</span></header>
+    <div class="body">
+      <div class="note"><span class="ep post">POST /api/v1/trading/buy</span> body <code>{ stockId, quantity }</code> → <code>{ tradeId, unitPrice, totalAmount, status }</code></div>
+      <div class="field"><label>Quantity</label><div class="qty"><button>−</button><input class="input" value="5"><button>+</button></div></div>
+      <div class="summ">
+        <div class="l muted"><span>Unit price</span><span class="mono">¢192.78</span></div>
+        <div class="l"><b>Total</b><b class="mono">¢963.90</b></div>
+        <div class="l faint" style="font-size:11px;margin-top:6px"><span>Wallet after</span><span>¢8,500.00 → ¢7,536.10</span></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn ghost" style="flex:1;justify-content:center" onclick="closeModal('tradeModal')">Cancel</button>
+        <button class="btn primary" style="flex:2;justify-content:center" onclick="closeModal('tradeModal');toast('ok','Trade complete','Bought 5 mrekk @ ¢192.78')">Confirm Buy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ADD PLAYER MODAL ===================== -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)closeModal('addModal')">
+  <div class="modal">
+    <header><b>Add tracked player</b><span class="x" onclick="closeModal('addModal')">×</span></header>
+    <div class="body">
+      <div class="note">Search ← <span class="ep get">GET /admin/tracked-players/search?query</span> (osu! API) · add ← <span class="ep post">POST</span> <code>{ osuUserId, trackingTier }</code></div>
+      <div class="field"><label>Search osu! players</label><div class="search" style="width:100%"><span>🔍</span><input placeholder="e.g. cookiezi"></div></div>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border)">
+          <div class="pav">C</div><div style="flex:1"><b>BUG_Cookiezi</b><div class="faint mono" style="font-size:11px">#662704 · 0pp</div></div>
+          <select class="input" style="width:auto;padding:7px 9px"><option>Tier3</option><option>Tier2</option><option>Tier1</option></select>
+          <button class="btn primary sm" onclick="closeModal('addModal');toast('ok','Added','Now tracking BUG_Cookiezi')">Add</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 13px">
+          <div class="pav">C</div><div style="flex:1"><b>Cookiezi</b> <span class="badge on">tracked</span><div class="faint mono" style="font-size:11px">#4787150 · 16,600pp · #13</div></div>
+          <button class="btn sm" disabled style="opacity:.4">Tracked</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ERROR STATES SHOWCASE (toasts) ===================== -->
+<div class="toasts" id="toasts"></div>
+
+<!-- ===================== DEMO FLOAT BAR ===================== -->
+<div class="floatbar">
+  <span>Prototype demo:</span>
+  <button onclick="openLogin()">Login screen</button>
+  <button onclick="openTrade(null,'buy')">Trade modal</button>
+  <button onclick="toast('err','TRADE_COOLDOWN','Wait 30s before trading mrekk again')">Error toast</button>
+  <button onclick="toast('warn','MAINTENANCE_MODE','Trading disabled for maintenance')">Maint. banner</button>
+</div>
+
+<script>
+  const titles={market:['Market','<span class="ep get">GET /api/v1/market</span> <span class="ep get">GET /api/v1/market/stocks</span>'],
+    stock:['Stock Detail','<span class="ep get">GET /market/stocks/{id}</span> <span class="ep get">/history</span>'],
+    portfolio:['Portfolio','<span class="ep get">GET /api/v1/portfolio</span>'],
+    wallet:['Wallet','<span class="ep get">GET /api/v1/wallet</span> <span class="ep get">/transactions</span>'],
+    history:['Trade History','<span class="ep get">GET /api/v1/trading/history</span>'],
+    players:['Tracked Players','<span class="ep get">GET /admin/tracked-players</span>'],
+    settings:['Market Settings','<span class="ep get">GET</span> <span class="ep put">PUT /admin/market-settings</span>']};
+  function go(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+    document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.go===id));
+    if(titles[id]){document.getElementById('pageTitle').innerHTML=titles[id][0];document.getElementById('pageEp').innerHTML=titles[id][1];}
+    document.getElementById('topSearch').style.visibility = id==='market'?'visible':'hidden';
+    document.querySelector('.content').scrollTop=0;
+  }
+  document.querySelectorAll('.nav a').forEach(a=>a.onclick=()=>go(a.dataset.go));
+  function openModal(id){document.getElementById(id).classList.add('open')}
+  function closeModal(id){document.getElementById(id).classList.remove('open')}
+  function openTrade(e,side){if(e)e.stopPropagation();document.getElementById('tradeTitle').textContent=(side==='buy'?'Buy':'Sell')+' mrekk';openModal('tradeModal')}
+  function openLogin(){document.getElementById('loginScreen').classList.add('open')}
+  function closeLogin(){document.getElementById('loginScreen').classList.remove('open')}
+  function toast(kind,title,msg){
+    const cls={err:'',ok:'ok',warn:'warn'}[kind];
+    const el=document.createElement('div');el.className='toast '+cls;
+    el.innerHTML=`<span style="font-size:16px">${kind==='ok'?'✅':kind==='warn'?'🛠️':'⚠️'}</span><div><b>${title}</b><div class="muted" style="font-size:12.5px">${msg}</div><div class="code">code: ${title.replace(/\s/g,'_').toUpperCase()}</div></div>`;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(()=>{el.style.opacity=0;el.style.transition='.4s';setTimeout(()=>el.remove(),400)},3800);
+  }
+</script>
+</body>
+</html>
