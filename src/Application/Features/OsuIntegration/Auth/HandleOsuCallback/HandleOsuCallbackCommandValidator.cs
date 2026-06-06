@@ -8,7 +8,7 @@ public sealed class HandleOsuCallbackCommandValidator : AbstractValidator<Handle
     {
         RuleFor(x => x.Code)
             .NotEmpty()
-            .MaximumLength(512);
+            .MaximumLength(4096);
 
         RuleFor(x => x.State)
             .NotEmpty()
