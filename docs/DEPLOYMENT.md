@@ -168,6 +168,54 @@ $env:Jwt__SigningKey='use-a-long-random-signing-key-at-least-32-characters'
 dotnet run --project src/Worker/OsuStocks.Worker.csproj
 ```
 
+## Backups & Disaster Recovery
+
+PostgreSQL is the sole persistent store. Redis is ephemeral and does not require backup.
+
+### Backup Scripts
+
+Two scripts are included in the `scripts/` directory and mounted read-only into the `postgres` container:
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/pg-backup.sh` | Creates a compressed `pg_dump` backup with automatic retention pruning |
+| `scripts/pg-restore.sh` | Drops and recreates the database from a backup file |
+
+### Running a Backup
+
+```bash
+docker compose exec postgres /scripts/pg-backup.sh
+```
+
+Backups are stored in the `postgres_backups` Docker volume at `/backups/` inside the container.
+
+### Scheduling Daily Backups
+
+Add a cron entry on the Docker host:
+
+```bash
+0 2 * * * cd /path/to/project && docker compose exec -T postgres /scripts/pg-backup.sh >> /var/log/osu-stocks-backup.log 2>&1
+```
+
+### Restoring from Backup
+
+**WARNING**: This drops and recreates the database.
+
+```bash
+docker compose stop api worker
+docker compose exec postgres /scripts/pg-restore.sh /backups/osu_stocks_20260606_020000.sql.gz
+docker compose start api worker
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RETENTION_DAYS` | 30 | Days to keep backups before pruning |
+| `BACKUP_DIR` | `/backups` | Backup storage path inside container |
+
+For full disaster recovery procedures, restore-to-new-host instructions, and recovery time objectives, see `docs/DISASTER_RECOVERY.md`.
+
 ## Operational Notes
 
 - Keep `Security__EnableSwagger` unset in production unless there is a temporary operational need.
@@ -175,3 +223,4 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 - Use TLS termination and forward HTTPS correctly so `Request.IsHttps` remains true for dashboard access.
 - Add `.env` to `.gitignore` to prevent committing production secrets (already configured).
 - Use `.env.example` as the template; it contains all variables with placeholder values and documentation.
+- Copy backups to off-host storage regularly; Docker volumes alone do not protect against host failure.
