@@ -38,6 +38,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -122,6 +123,14 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// Accept/emit enums as their string names so request binding matches the
+// string enum values the API already returns in responses (e.g. "Tier3").
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+
 builder.Services.AddSingleton<IDashboardAuthorizationFilter, HangfireDashboardAuthorizationFilter>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

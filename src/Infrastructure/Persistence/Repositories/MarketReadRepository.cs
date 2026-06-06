@@ -8,8 +8,6 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
 {
     public async Task<MarketOverviewReadModel> GetOverviewAsync(CancellationToken cancellationToken = default)
     {
-        var metricsQuery = BuildStockMetricsQuery(DateTimeOffset.UtcNow.AddHours(-24));
-
         var totalStocks = await dbContext.PlayerStocks
             .AsNoTracking()
             .CountAsync(cancellationToken);
@@ -19,94 +17,82 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             .Select(x => (long?)x.Quantity)
             .SumAsync(cancellationToken) ?? 0L;
 
-        var topGainerMetric = await metricsQuery
-            .OrderByDescending(x => x.PriceChange24h)
-            .FirstOrDefaultAsync(cancellationToken);
+        var rows = await BuildStockMetricRowQuery(DateTimeOffset.UtcNow.AddHours(-24))
+            .ToListAsync(cancellationToken);
 
-        var topLoserMetric = await metricsQuery
+        var items = rows.Select(ToListItem).ToList();
+
+        var topGainer = items
+            .OrderByDescending(x => x.PriceChange24h)
+            .ThenBy(x => x.PlayerName)
+            .FirstOrDefault();
+
+        var topLoser = items
             .OrderBy(x => x.PriceChange24h)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ThenBy(x => x.PlayerName)
+            .FirstOrDefault();
 
         return new MarketOverviewReadModel(
             totalStocks,
             totalVolume,
-            topGainerMetric is null
+            topGainer is null
                 ? null
                 : new MarketTopMoverReadModel(
-                    topGainerMetric.StockId,
-                    topGainerMetric.PlayerName,
-                    topGainerMetric.CurrentPrice,
-                    topGainerMetric.PriceChange24h),
-            topLoserMetric is null
+                    topGainer.StockId, topGainer.PlayerName, topGainer.CurrentPrice, topGainer.PriceChange24h),
+            topLoser is null
                 ? null
                 : new MarketTopMoverReadModel(
-                    topLoserMetric.StockId,
-                    topLoserMetric.PlayerName,
-                    topLoserMetric.CurrentPrice,
-                    topLoserMetric.PriceChange24h));
+                    topLoser.StockId, topLoser.PlayerName, topLoser.CurrentPrice, topLoser.PriceChange24h));
     }
 
     public async Task<MarketStocksPageReadModel> GetStocksAsync(
         MarketStocksQuerySpec spec,
         CancellationToken cancellationToken = default)
     {
-        var query = BuildStockMetricsQuery(DateTimeOffset.UtcNow.AddHours(-24));
+        var rowQuery = BuildStockMetricRowQuery(DateTimeOffset.UtcNow.AddHours(-24));
 
         if (!string.IsNullOrWhiteSpace(spec.Search))
         {
             var searchTerm = spec.Search.Trim().ToLower();
-            query = query.Where(x => x.PlayerName.ToLower().Contains(searchTerm));
+            rowQuery = rowQuery.Where(x => x.PlayerName.ToLower().Contains(searchTerm));
         }
 
-        query = ApplySorting(query, spec.Sort);
+        // The 24h change depends on a reference price that is a coalesce of correlated
+        // subqueries and the current price; EF cannot translate that arithmetic (nor sort
+        // by it) in SQL. The tracked-stock set is small, so we materialize the translatable
+        // projection (filtered in SQL) and compute/sort/paginate the derived metric in memory.
+        var rows = await rowQuery.ToListAsync(cancellationToken);
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var items = rows.Select(ToListItem).ToList();
+        var totalCount = items.Count;
 
-        var skip = (spec.Page - 1) * spec.PageSize;
-
-        var items = await query
-            .Skip(skip)
+        var pageItems = ApplySorting(items, spec.Sort)
+            .Skip((spec.Page - 1) * spec.PageSize)
             .Take(spec.PageSize)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
-        return new MarketStocksPageReadModel(items, totalCount);
+        return new MarketStocksPageReadModel(pageItems, totalCount);
     }
 
-    public Task<MarketStockDetailsReadModel?> GetStockDetailsAsync(Guid stockId, CancellationToken cancellationToken = default)
+    public async Task<MarketStockDetailsReadModel?> GetStockDetailsAsync(
+        Guid stockId,
+        CancellationToken cancellationToken = default)
     {
-        var cutoff = DateTimeOffset.UtcNow.AddHours(-24);
+        var row = await BuildStockMetricRowQuery(DateTimeOffset.UtcNow.AddHours(-24))
+            .Where(x => x.StockId == stockId)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        var query =
-            from stock in dbContext.PlayerStocks.AsNoTracking()
-            join player in dbContext.TrackedPlayers.AsNoTracking()
-                on stock.TrackedPlayerId equals player.Id
-            where stock.Id == stockId
-            let volume = dbContext.Trades
-                .AsNoTracking()
-                .Where(x => x.StockId == stock.Id)
-                .Select(x => (long?)x.Quantity)
-                .Sum() ?? 0L
-            let baselinePrice = dbContext.StockPriceHistory
-                .AsNoTracking()
-                .Where(x => x.StockId == stock.Id && x.CreatedAt <= cutoff)
-                .OrderByDescending(x => x.CreatedAt)
-                .Select(x => (decimal?)x.NewPrice)
-                .FirstOrDefault()
-            let fallbackPrice = dbContext.StockPriceHistory
-                .AsNoTracking()
-                .Where(x => x.StockId == stock.Id)
-                .OrderBy(x => x.CreatedAt)
-                .Select(x => (decimal?)x.PreviousPrice)
-                .FirstOrDefault()
-            let referencePrice = baselinePrice ?? fallbackPrice ?? stock.CurrentPrice
-            select new MarketStockDetailsReadModel(
-                stock.Id,
-                player.Username,
-                stock.CurrentPrice,
-                volume,
-                referencePrice == 0m ? 0m : ((stock.CurrentPrice - referencePrice) / referencePrice) * 100m);
+        if (row is null)
+        {
+            return null;
+        }
 
-        return query.FirstOrDefaultAsync(cancellationToken);
+        return new MarketStockDetailsReadModel(
+            row.StockId,
+            row.PlayerName,
+            row.CurrentPrice,
+            row.Volume,
+            ComputeChange24h(row));
     }
 
     public async Task<IReadOnlyList<MarketStockHistoryPointReadModel>> GetStockHistoryAsync(
@@ -121,53 +107,81 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             .ToListAsync(cancellationToken);
     }
 
-    private IQueryable<MarketStockListItemReadModel> BuildStockMetricsQuery(DateTimeOffset cutoff)
+    // Projects only SQL-translatable pieces: the player join, the trade-volume aggregate,
+    // and the baseline/fallback reference prices via correlated subqueries. No arithmetic
+    // or cross-subquery coalesce here, so EF can translate the whole query.
+    private IQueryable<StockMetricRow> BuildStockMetricRowQuery(DateTimeOffset cutoff)
     {
         return
             from stock in dbContext.PlayerStocks.AsNoTracking()
             join player in dbContext.TrackedPlayers.AsNoTracking()
                 on stock.TrackedPlayerId equals player.Id
-            let volume = dbContext.Trades
-                .AsNoTracking()
-                .Where(x => x.StockId == stock.Id)
-                .Select(x => (long?)x.Quantity)
-                .Sum() ?? 0L
-            let baselinePrice = dbContext.StockPriceHistory
-                .AsNoTracking()
-                .Where(x => x.StockId == stock.Id && x.CreatedAt <= cutoff)
-                .OrderByDescending(x => x.CreatedAt)
-                .Select(x => (decimal?)x.NewPrice)
-                .FirstOrDefault()
-            let fallbackPrice = dbContext.StockPriceHistory
-                .AsNoTracking()
-                .Where(x => x.StockId == stock.Id)
-                .OrderBy(x => x.CreatedAt)
-                .Select(x => (decimal?)x.PreviousPrice)
-                .FirstOrDefault()
-            let referencePrice = baselinePrice ?? fallbackPrice ?? stock.CurrentPrice
-            select new MarketStockListItemReadModel(
-                stock.Id,
-                player.Username,
-                stock.CurrentPrice,
-                volume,
-                referencePrice == 0m ? 0m : ((stock.CurrentPrice - referencePrice) / referencePrice) * 100m);
+            select new StockMetricRow
+            {
+                StockId = stock.Id,
+                PlayerName = player.Username,
+                CurrentPrice = stock.CurrentPrice,
+                Volume = dbContext.Trades
+                    .Where(x => x.StockId == stock.Id)
+                    .Select(x => (long?)x.Quantity)
+                    .Sum() ?? 0L,
+                BaselinePrice = dbContext.StockPriceHistory
+                    .Where(x => x.StockId == stock.Id && x.CreatedAt <= cutoff)
+                    .OrderByDescending(x => x.CreatedAt)
+                    .Select(x => (decimal?)x.NewPrice)
+                    .FirstOrDefault(),
+                FallbackPrice = dbContext.StockPriceHistory
+                    .Where(x => x.StockId == stock.Id)
+                    .OrderBy(x => x.CreatedAt)
+                    .Select(x => (decimal?)x.PreviousPrice)
+                    .FirstOrDefault()
+            };
     }
 
-    private static IQueryable<MarketStockListItemReadModel> ApplySorting(
-        IQueryable<MarketStockListItemReadModel> query,
+    private static MarketStockListItemReadModel ToListItem(StockMetricRow row)
+    {
+        return new MarketStockListItemReadModel(
+            row.StockId,
+            row.PlayerName,
+            row.CurrentPrice,
+            row.Volume,
+            ComputeChange24h(row));
+    }
+
+    private static decimal ComputeChange24h(StockMetricRow row)
+    {
+        var referencePrice = row.BaselinePrice ?? row.FallbackPrice ?? row.CurrentPrice;
+
+        return referencePrice == 0m
+            ? 0m
+            : ((row.CurrentPrice - referencePrice) / referencePrice) * 100m;
+    }
+
+    private static IReadOnlyList<MarketStockListItemReadModel> ApplySorting(
+        IReadOnlyList<MarketStockListItemReadModel> items,
         string? sort)
     {
-        return sort?.Trim().ToLowerInvariant() switch
+        return (sort?.Trim().ToLowerInvariant() switch
         {
-            "price_asc" => query.OrderBy(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
-            "price_desc" => query.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
-            "name_asc" => query.OrderBy(x => x.PlayerName),
-            "name_desc" => query.OrderByDescending(x => x.PlayerName),
-            "volume_asc" => query.OrderBy(x => x.Volume).ThenBy(x => x.PlayerName),
-            "volume_desc" => query.OrderByDescending(x => x.Volume).ThenBy(x => x.PlayerName),
-            "change24h_asc" => query.OrderBy(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
-            "change24h_desc" => query.OrderByDescending(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
-            _ => query.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName)
-        };
+            "price_asc" => items.OrderBy(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
+            "price_desc" => items.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
+            "name_asc" => items.OrderBy(x => x.PlayerName),
+            "name_desc" => items.OrderByDescending(x => x.PlayerName),
+            "volume_asc" => items.OrderBy(x => x.Volume).ThenBy(x => x.PlayerName),
+            "volume_desc" => items.OrderByDescending(x => x.Volume).ThenBy(x => x.PlayerName),
+            "change24h_asc" => items.OrderBy(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
+            "change24h_desc" => items.OrderByDescending(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
+            _ => items.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName)
+        }).ToList();
+    }
+
+    private sealed class StockMetricRow
+    {
+        public Guid StockId { get; init; }
+        public string PlayerName { get; init; } = string.Empty;
+        public decimal CurrentPrice { get; init; }
+        public long Volume { get; init; }
+        public decimal? BaselinePrice { get; init; }
+        public decimal? FallbackPrice { get; init; }
     }
 }
