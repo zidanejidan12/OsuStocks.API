@@ -23,3 +23,9 @@ src/Worker/appsettings.Local.json
 
 # Local codex workspace files
 .codex/
+
+# Docker environment secrets
+.env
+
+# Claude workfspace files
+.claude

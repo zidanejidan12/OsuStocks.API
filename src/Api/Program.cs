@@ -2,9 +2,11 @@ using Hangfire;
 using Hangfire.Dashboard;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OsuStocks.Api.Common;
+using OsuStocks.Api.Middleware;
 using OsuStocks.Api.Security;
 using OsuStocks.Application;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
@@ -33,12 +35,47 @@ using OsuStocks.Infrastructure;
 using OsuStocks.Infrastructure.Authentication;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var swaggerEnabled = builder.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Security:EnableSwagger");
 
 ValidateProductionSecretEnvironmentVariables(builder.Configuration, builder.Environment);
+
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(corsOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = 10;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+
+    options.AddFixedWindowLimiter("trading", limiter =>
+    {
+        limiter.PermitLimit = 30;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+});
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -93,23 +130,28 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
 if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
-{
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "OsuStocks API v1");
-    options.RoutePrefix = "swagger";
-});
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "OsuStocks API v1");
+        options.RoutePrefix = "swagger";
+    });
 }
 
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }));
 
-var authGroup = app.MapGroup("/api/v1/auth");
+var authGroup = app.MapGroup("/api/v1/auth")
+    .RequireRateLimiting("auth");
 
 authGroup.MapGet("/login", async (
     string? returnUrl,
@@ -288,7 +330,8 @@ marketGroup.MapGet("/stocks/{stockId:guid}/history", async (
     }));
 });
 var tradingGroup = app.MapGroup("/api/v1/trading")
-    .RequireAuthorization();
+    .RequireAuthorization()
+    .RequireRateLimiting("trading");
 
 tradingGroup.MapPost("/buy", async (
     TradeStockRequest request,

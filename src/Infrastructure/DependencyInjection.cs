@@ -7,6 +7,8 @@ using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.Market.Interfaces;
 using OsuStocks.Domain.Repositories;
+using OsuStocks.Application.Features.Trading.Services;
+using OsuStocks.Infrastructure.AntiAbuse;
 using OsuStocks.Infrastructure.Authentication;
 using OsuStocks.Infrastructure.Market;
 using OsuStocks.Infrastructure.Market.Options;
@@ -40,6 +42,7 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<MarketEngineOptions>(configuration.GetSection(MarketEngineOptions.SectionName));
         services.Configure<OAuthReturnUrlOptions>(configuration.GetSection(OAuthReturnUrlOptions.SectionName));
+        services.Configure<AntiAbuseOptions>(configuration.GetSection(AntiAbuseOptions.SectionName));
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(postgresConnection, npgsqlOptions =>
@@ -64,6 +67,9 @@ public static class DependencyInjection
         services.AddScoped<IMarketSettingsRepository, MarketSettingsRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
+        services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
+        services.AddSingleton<IAntiAbuseSettings, AntiAbuseSettings>();
+        services.AddScoped<ITradingGuardService, TradingGuardService>();
         services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
@@ -71,6 +77,7 @@ public static class DependencyInjection
         services.AddSingleton<IOAuthReturnUrlPolicy, OAuthReturnUrlPolicy>();
 
         services.AddScoped<OsuSynchronizationRecurringJob>();
+        services.AddScoped<InactivityDecayRecurringJob>();
         services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
 
         services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();

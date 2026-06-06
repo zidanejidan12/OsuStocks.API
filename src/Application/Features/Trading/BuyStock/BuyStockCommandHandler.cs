@@ -2,6 +2,7 @@ using MediatR;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Application.Features.Market.Notifications;
+using OsuStocks.Application.Features.Trading.Services;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Market.Events;
@@ -19,7 +20,8 @@ public sealed class BuyStockCommandHandler(
     ITradeRepository tradeRepository,
     IWalletTransactionRepository walletTransactionRepository,
     IApplicationDbContext dbContext,
-    IPublisher publisher)
+    IPublisher publisher,
+    ITradingGuardService tradingGuardService)
     : IRequestHandler<BuyStockCommand, Result<BuyStockResponse>>
 {
     public async Task<Result<BuyStockResponse>> Handle(BuyStockCommand request, CancellationToken cancellationToken)
@@ -59,6 +61,24 @@ public sealed class BuyStockCommandHandler(
             return Result.Failure<BuyStockResponse>("CONFLICT", "Stock is disabled for buying.");
         }
 
+        var cooldownResult = await tradingGuardService.CheckCooldownAsync(
+            request.UserId, request.StockId, cancellationToken);
+        if (!cooldownResult.IsSuccess)
+        {
+            return Result.Failure<BuyStockResponse>(cooldownResult.Error!.Code, cooldownResult.Error.Message);
+        }
+
+        var existingHoldingForLimit = await holdingRepository.GetByPortfolioAndStockAsync(
+            portfolio.Id, stock.Id, cancellationToken);
+        var currentQuantity = existingHoldingForLimit?.Quantity ?? 0;
+
+        var positionResult = await tradingGuardService.CheckPositionLimitAsync(
+            request.UserId, request.StockId, request.Quantity, currentQuantity, cancellationToken);
+        if (!positionResult.IsSuccess)
+        {
+            return Result.Failure<BuyStockResponse>(positionResult.Error!.Code, positionResult.Error.Message);
+        }
+
         var unitPrice = stock.CurrentPrice;
         var totalAmount = unitPrice * request.Quantity;
 
@@ -72,10 +92,7 @@ public sealed class BuyStockCommandHandler(
         wallet.UpdatedBy = "trading";
         walletRepository.Update(wallet);
 
-        var existingHolding = await holdingRepository.GetByPortfolioAndStockAsync(
-            portfolio.Id,
-            stock.Id,
-            cancellationToken);
+        var existingHolding = existingHoldingForLimit;
 
         if (existingHolding is null)
         {
@@ -134,6 +151,8 @@ public sealed class BuyStockCommandHandler(
 
         await publisher.Publish(new BuyOrderExecutedNotification(
             new BuyOrderExecuted(stock.Id, request.Quantity, unitPrice, DateTimeOffset.UtcNow)), cancellationToken);
+
+        await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
         return Result.Success(new BuyStockResponse(trade.Id, unitPrice, totalAmount));
     }

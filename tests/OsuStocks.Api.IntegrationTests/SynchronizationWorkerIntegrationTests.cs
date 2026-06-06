@@ -242,6 +242,23 @@ public sealed class SynchronizationWorkerIntegrationTests
             return Task.FromResult<PlayerSnapshot?>(Clone(latest));
         }
 
+        public Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestByTrackedPlayerIdsAsync(
+            IReadOnlyCollection<Guid> trackedPlayerIds,
+            CancellationToken cancellationToken = default)
+        {
+            var result = new Dictionary<Guid, PlayerSnapshot>();
+
+            foreach (var id in trackedPlayerIds)
+            {
+                if (_snapshotsByTrackedPlayerId.TryGetValue(id, out var list) && list.Count > 0)
+                {
+                    result[id] = Clone(list.OrderByDescending(x => x.CapturedAt).First());
+                }
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<Guid, PlayerSnapshot>>(result);
+        }
+
         private static PlayerSnapshot Clone(PlayerSnapshot snapshot)
         {
             return new PlayerSnapshot

@@ -10,4 +10,12 @@ public interface ITradeRepository
         int skip,
         int take,
         CancellationToken cancellationToken = default);
+    Task<Trade?> GetLastByUserAndStockAsync(
+        Guid userId,
+        Guid stockId,
+        CancellationToken cancellationToken = default);
+    Task<int> CountRecentByUserAsync(
+        Guid userId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default);
 }

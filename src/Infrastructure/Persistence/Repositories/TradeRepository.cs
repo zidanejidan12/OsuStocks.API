@@ -25,4 +25,27 @@ internal sealed class TradeRepository(AppDbContext dbContext) : ITradeRepository
             .Take(take)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<Trade?> GetLastByUserAndStockAsync(
+        Guid userId,
+        Guid stockId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Trades
+            .AsNoTracking()
+            .Where(x => x.UserId == userId && x.StockId == stockId)
+            .OrderByDescending(x => x.ExecutedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<int> CountRecentByUserAsync(
+        Guid userId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Trades
+            .AsNoTracking()
+            .Where(x => x.UserId == userId && x.ExecutedAt >= since)
+            .CountAsync(cancellationToken);
+    }
 }

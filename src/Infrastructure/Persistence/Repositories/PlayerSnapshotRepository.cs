@@ -21,4 +21,18 @@ internal sealed class PlayerSnapshotRepository(AppDbContext dbContext) : IPlayer
             .OrderByDescending(x => x.CapturedAt)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestByTrackedPlayerIdsAsync(
+        IReadOnlyCollection<Guid> trackedPlayerIds,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshots = await dbContext.PlayerSnapshots
+            .AsNoTracking()
+            .Where(x => trackedPlayerIds.Contains(x.TrackedPlayerId))
+            .GroupBy(x => x.TrackedPlayerId)
+            .Select(g => g.OrderByDescending(x => x.CapturedAt).First())
+            .ToDictionaryAsync(x => x.TrackedPlayerId, cancellationToken);
+
+        return snapshots;
+    }
 }
