@@ -34,7 +34,10 @@ using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
 using OsuStocks.Infrastructure.Authentication;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -79,6 +82,18 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Postgres")!,
+        name: "postgresql",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["db", "ready"])
+    .AddRedis(
+        sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Redis")!,
+        name: "redis",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["cache", "ready"]);
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt configuration section is missing.");
@@ -147,8 +162,30 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
-app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
-app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }));
+var healthCheckOptions = new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var response = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                duration = e.Value.Duration.TotalMilliseconds,
+                description = e.Value.Description,
+                exception = e.Value.Exception?.Message
+            }),
+            totalDuration = report.TotalDuration.TotalMilliseconds
+        };
+        await context.Response.WriteAsJsonAsync(response, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+    }
+};
+
+app.MapHealthChecks("/health", healthCheckOptions);
+app.MapHealthChecks("/api/v1/health", healthCheckOptions);
 
 var authGroup = app.MapGroup("/api/v1/auth")
     .RequireRateLimiting("auth");

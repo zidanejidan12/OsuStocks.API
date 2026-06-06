@@ -65,12 +65,39 @@ All violations produce structured log entries with `UserId`, `StockId`, timestam
 
 Use the dashboard to monitor job execution, view failures, and manually trigger jobs if needed.
 
-## Health Check
+## Health Checks
 
-- URL: `/api/v1/health`
-- Returns: `200 OK` with `{ "status": "Healthy" }`
+Two endpoints verify application and dependency health:
 
-Note: Currently a static check. Does not verify PostgreSQL or Redis connectivity.
+- `/health`
+- `/api/v1/health`
+
+Both return a JSON response with individual check results:
+
+```json
+{
+  "status": "Healthy",
+  "checks": [
+    { "name": "postgresql", "status": "Healthy", "duration": 12.3 },
+    { "name": "redis", "status": "Healthy", "duration": 5.1 }
+  ],
+  "totalDuration": 15.8
+}
+```
+
+| Status | HTTP Code | Meaning |
+|--------|-----------|---------|
+| Healthy | 200 | All dependencies reachable |
+| Unhealthy | 503 | One or more dependencies unreachable |
+
+Checked dependencies:
+
+| Name | Tags | Description |
+|------|------|-------------|
+| `postgresql` | db, ready | PostgreSQL connectivity via `SELECT 1` |
+| `redis` | cache, ready | Redis connectivity via `PING` |
+
+Use these endpoints for Docker Compose health checks, load balancer probes, and monitoring systems.
 
 ## Key Configuration Sections
 

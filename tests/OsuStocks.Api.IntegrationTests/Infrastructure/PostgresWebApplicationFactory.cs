@@ -15,7 +15,8 @@ namespace OsuStocks.Api.IntegrationTests.Infrastructure;
 
 internal sealed class PostgresWebApplicationFactory(
     PostgresTestcontainerFixture fixture,
-    QueryCountingCommandInterceptor? queryCounter = null)
+    QueryCountingCommandInterceptor? queryCounter = null,
+    string? postgresConnectionOverride = null)
     : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"osu_stocks_it_{Guid.NewGuid():N}";
@@ -34,7 +35,7 @@ internal sealed class PostgresWebApplicationFactory(
         {
             var inMemorySettings = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Postgres"] = fixture.BuildDatabaseConnectionString(_databaseName),
+                ["ConnectionStrings:Postgres"] = postgresConnectionOverride ?? fixture.BuildDatabaseConnectionString(_databaseName),
                 ["ConnectionStrings:Redis"] = "localhost:6379",
                 ["Jwt:Issuer"] = "osu-stocks-test",
                 ["Jwt:Audience"] = "osu-stocks-test-client",
@@ -97,13 +98,19 @@ internal sealed class PostgresWebApplicationFactory(
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        EnsureDatabaseCreated();
+        if (postgresConnectionOverride is null)
+        {
+            EnsureDatabaseCreated();
+        }
 
         var host = base.CreateHost(builder);
 
-        using var scope = host.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        dbContext.Database.Migrate();
+        if (postgresConnectionOverride is null)
+        {
+            using var scope = host.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.Database.Migrate();
+        }
 
         return host;
     }
