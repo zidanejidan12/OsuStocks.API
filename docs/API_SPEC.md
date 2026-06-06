@@ -24,9 +24,21 @@ Purpose:
 
 Redirect user to osu! OAuth.
 
+Query Parameters:
+
+`returnUrl` (optional)
+
+- Must be an absolute `http` or `https` URL.
+- Origin must be allow-listed in `Security:OAuthReturnUrl:AllowedOrigins`.
+- `localhost` loopback origins are allowed in `Development` only.
+
 Response:
 
 302 Redirect
+
+Errors:
+
+400 `VALIDATION_ERROR` when `returnUrl` is invalid or not allow-listed
 
 ---
 
@@ -44,7 +56,8 @@ Example:
 
 {
 "accessToken": "jwt-token",
-"expiresAt": "2027-01-01T00:00:00Z"
+"expiresAt": "2027-01-01T00:00:00Z",
+"returnUrl": "https://app.osustocks.example/dashboard"
 }
 
 ---
@@ -446,4 +459,5 @@ Future:
 /api/v2
 
 Breaking changes require new version.
+
 

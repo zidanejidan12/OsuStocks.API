@@ -10,7 +10,8 @@ using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Api.IntegrationTests.Infrastructure;
 
-internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
+internal sealed class CustomWebApplicationFactory(IDictionary<string, string?>? configurationOverrides = null)
+    : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -33,8 +34,17 @@ internal sealed class CustomWebApplicationFactory : WebApplicationFactory<Progra
                 ["OsuOAuth:TokenEndpoint"] = "https://osu.ppy.sh/oauth/token",
                 ["OsuOAuth:Scopes:0"] = "public",
                 ["OsuOAuth:Scopes:1"] = "identify",
-                ["OsuApi:BaseUrl"] = "https://osu.ppy.sh/api/v2/"
+                ["OsuApi:BaseUrl"] = "https://osu.ppy.sh/api/v2/",
+                ["Security:OAuthReturnUrl:AllowedOrigins:0"] = "https://app.osustocks.example"
             };
+
+            if (configurationOverrides is not null)
+            {
+                foreach (var (key, value) in configurationOverrides)
+                {
+                    inMemorySettings[key] = value;
+                }
+            }
 
             configBuilder.AddInMemoryCollection(inMemorySettings);
         });

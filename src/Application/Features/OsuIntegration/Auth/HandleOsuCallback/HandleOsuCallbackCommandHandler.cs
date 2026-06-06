@@ -17,7 +17,8 @@ public sealed class HandleOsuCallbackCommandHandler(
     IWalletRepository walletRepository,
     IWalletTransactionRepository walletTransactionRepository,
     IPortfolioRepository portfolioRepository,
-    IApplicationDbContext dbContext)
+    IApplicationDbContext dbContext,
+    IOAuthReturnUrlPolicy returnUrlPolicy)
     : IRequestHandler<HandleOsuCallbackCommand, Result<HandleOsuCallbackResponse>>
 {
     private const decimal StartingCredits = 100_000m;
@@ -30,6 +31,11 @@ public sealed class HandleOsuCallbackCommandHandler(
         if (oauthState is null)
         {
             return Result.Failure<HandleOsuCallbackResponse>("INVALID_STATE", "OAuth state is invalid or expired.");
+        }
+
+        if (!returnUrlPolicy.IsAllowed(oauthState.ReturnUrl))
+        {
+            return Result.Failure<HandleOsuCallbackResponse>("FORBIDDEN", "Return URL origin is not allowed.");
         }
 
         try
@@ -64,7 +70,7 @@ public sealed class HandleOsuCallbackCommandHandler(
                 };
                 await walletRepository.AddAsync(wallet, cancellationToken);
 
-                var initialGrant = new OsuStocks.Domain.Entities.WalletTransaction
+                var initialGrant = new WalletTransaction
                 {
                     Id = Guid.NewGuid(),
                     WalletId = wallet.Id,
@@ -110,5 +116,4 @@ public sealed class HandleOsuCallbackCommandHandler(
         }
     }
 }
-
 

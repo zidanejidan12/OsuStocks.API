@@ -17,6 +17,7 @@ using OsuStocks.Infrastructure.OsuIntegration.Options;
 using OsuStocks.Infrastructure.OsuIntegration.Tokens;
 using OsuStocks.Infrastructure.Persistence;
 using OsuStocks.Infrastructure.Persistence.Repositories;
+using OsuStocks.Infrastructure.Security;
 using System.Net.Http.Headers;
 
 namespace OsuStocks.Infrastructure;
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.Configure<OsuApiOptions>(configuration.GetSection(OsuApiOptions.SectionName));
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<MarketEngineOptions>(configuration.GetSection(MarketEngineOptions.SectionName));
+        services.Configure<OAuthReturnUrlOptions>(configuration.GetSection(OAuthReturnUrlOptions.SectionName));
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(postgresConnection, npgsqlOptions =>
@@ -66,6 +68,7 @@ public static class DependencyInjection
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
         services.AddScoped<IAppTokenService, JwtAppTokenService>();
+        services.AddSingleton<IOAuthReturnUrlPolicy, OAuthReturnUrlPolicy>();
 
         services.AddScoped<OsuSynchronizationRecurringJob>();
         services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
@@ -110,3 +113,4 @@ public static class DependencyInjection
         return services;
     }
 }
+
