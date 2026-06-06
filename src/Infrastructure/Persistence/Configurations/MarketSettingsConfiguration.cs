@@ -15,6 +15,7 @@ internal sealed class MarketSettingsConfiguration : IEntityTypeConfiguration<Mar
         builder.Property(x => x.PpMultiplier).HasColumnName("pp_multiplier").HasColumnType("numeric(10,4)").IsRequired();
         builder.Property(x => x.TradeMultiplier).HasColumnName("trade_multiplier").HasColumnType("numeric(10,4)").IsRequired();
         builder.Property(x => x.DecayMultiplier).HasColumnName("decay_multiplier").HasColumnType("numeric(10,4)").IsRequired();
+        builder.Property(x => x.IsMaintenanceMode).HasColumnName("is_maintenance_mode").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");

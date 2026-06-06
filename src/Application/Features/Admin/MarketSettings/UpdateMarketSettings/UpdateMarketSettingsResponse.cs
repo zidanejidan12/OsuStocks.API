@@ -3,4 +3,5 @@ namespace OsuStocks.Application.Features.Admin.MarketSettings.UpdateMarketSettin
 public sealed record UpdateMarketSettingsResponse(
     decimal PpMultiplier,
     decimal TradeMultiplier,
-    decimal DecayMultiplier);
+    decimal DecayMultiplier,
+    bool IsMaintenanceMode);

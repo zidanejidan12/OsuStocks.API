@@ -7,4 +7,5 @@ public sealed record UpdateMarketSettingsCommand(
     decimal PpMultiplier,
     decimal TradeMultiplier,
     decimal DecayMultiplier,
+    bool IsMaintenanceMode,
     string? Actor) : IRequest<Result<UpdateMarketSettingsResponse>>;

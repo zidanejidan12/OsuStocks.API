@@ -10,6 +10,7 @@ using OsuStocks.Domain.Repositories;
 namespace OsuStocks.Application.Features.Trading.SellStock;
 
 public sealed class SellStockCommandHandler(
+    IMarketSettingsRepository marketSettingsRepository,
     IWalletRepository walletRepository,
     IPortfolioRepository portfolioRepository,
     IPlayerStockRepository playerStockRepository,
@@ -22,6 +23,12 @@ public sealed class SellStockCommandHandler(
 {
     public async Task<Result<SellStockResponse>> Handle(SellStockCommand request, CancellationToken cancellationToken)
     {
+        var marketSettings = await marketSettingsRepository.GetCurrentAsync(cancellationToken);
+        if (marketSettings?.IsMaintenanceMode == true)
+        {
+            return Result.Failure<SellStockResponse>("CONFLICT", "Market is in maintenance mode.");
+        }
+
         var wallet = await walletRepository.GetByUserIdAsync(request.UserId, cancellationToken);
         if (wallet is null)
         {
