@@ -75,11 +75,11 @@ internal sealed class PostgresWebApplicationFactory(
             {
             });
 
-            if (queryCounter is null)
-            {
-                return;
-            }
-
+            // AddInfrastructure captures the connection string into the DbContext registration
+            // at build time, before this factory's in-memory config override is applied — so the
+            // context would otherwise bind to appsettings.Development.json (the developer's real
+            // database). Always re-register it against the per-test Testcontainer database so tests
+            // never touch a real instance, regardless of whether a query counter is supplied.
             services.RemoveAll<AppDbContext>();
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IApplicationDbContext>();
@@ -87,9 +87,13 @@ internal sealed class PostgresWebApplicationFactory(
             services.AddDbContext<AppDbContext>(options =>
             {
                 options.UseNpgsql(
-                    fixture.BuildDatabaseConnectionString(_databaseName),
+                    postgresConnectionOverride ?? fixture.BuildDatabaseConnectionString(_databaseName),
                     npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName));
-                options.AddInterceptors(queryCounter);
+
+                if (queryCounter is not null)
+                {
+                    options.AddInterceptors(queryCounter);
+                }
             });
 
             services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
