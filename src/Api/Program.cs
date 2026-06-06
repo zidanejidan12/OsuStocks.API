@@ -477,7 +477,8 @@ adminGroup.MapGet("/market-settings", async (
     {
         ppMultiplier = result.Value.PpMultiplier,
         tradeMultiplier = result.Value.TradeMultiplier,
-        decayMultiplier = result.Value.DecayMultiplier
+        decayMultiplier = result.Value.DecayMultiplier,
+        isMaintenanceMode = result.Value.IsMaintenanceMode
     });
 });
 
@@ -494,6 +495,7 @@ adminGroup.MapPut("/market-settings", async (
             request.PpMultiplier,
             request.TradeMultiplier,
             request.DecayMultiplier,
+            request.IsMaintenanceMode,
             actor),
         cancellationToken);
 
@@ -671,12 +673,13 @@ static void EnsureNotPlaceholder(string key, string? value)
 }
 
 public sealed record AddTrackedPlayerRequest(long OsuUserId, TrackingTier TrackingTier = TrackingTier.Tier3);
-public sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier);
+public sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier, bool IsMaintenanceMode);
 public sealed record TradeStockRequest(Guid StockId, int Quantity);
 
 public partial class Program
 {
 }
+
 
 
 

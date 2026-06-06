@@ -63,6 +63,7 @@ internal sealed class InMemoryMarketSettingsRepository : IMarketSettingsReposito
             PpMultiplier = source.PpMultiplier,
             TradeMultiplier = source.TradeMultiplier,
             DecayMultiplier = source.DecayMultiplier,
+            IsMaintenanceMode = source.IsMaintenanceMode,
             CreatedAt = source.CreatedAt,
             CreatedBy = source.CreatedBy,
             UpdatedAt = source.UpdatedAt,

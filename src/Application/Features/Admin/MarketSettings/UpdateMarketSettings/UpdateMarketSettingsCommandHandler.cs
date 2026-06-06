@@ -1,7 +1,6 @@
 using MediatR;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
-using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Application.Features.Admin.MarketSettings.UpdateMarketSettings;
@@ -27,6 +26,7 @@ public sealed class UpdateMarketSettingsCommandHandler(
                 PpMultiplier = request.PpMultiplier,
                 TradeMultiplier = request.TradeMultiplier,
                 DecayMultiplier = request.DecayMultiplier,
+                IsMaintenanceMode = request.IsMaintenanceMode,
                 CreatedAt = now,
                 CreatedBy = actor
             };
@@ -38,6 +38,7 @@ public sealed class UpdateMarketSettingsCommandHandler(
             settings.PpMultiplier = request.PpMultiplier;
             settings.TradeMultiplier = request.TradeMultiplier;
             settings.DecayMultiplier = request.DecayMultiplier;
+            settings.IsMaintenanceMode = request.IsMaintenanceMode;
             settings.UpdatedAt = now;
             settings.UpdatedBy = actor;
 
@@ -49,7 +50,7 @@ public sealed class UpdateMarketSettingsCommandHandler(
         return Result.Success(new UpdateMarketSettingsResponse(
             settings.PpMultiplier,
             settings.TradeMultiplier,
-            settings.DecayMultiplier));
+            settings.DecayMultiplier,
+            settings.IsMaintenanceMode));
     }
 }
-
