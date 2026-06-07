@@ -227,11 +227,25 @@ authGroup.MapGet("/callback", async (
         return result.Error!.ToErrorResult(httpContext);
     }
 
+    var callback = result.Value;
+
+    // The osu! handshake is a top-level browser navigation, so redirect the browser back to the
+    // SPA callback page with the token in the URL fragment (kept out of server logs/history) rather
+    // than returning JSON the frontend cannot consume from a full-page navigation.
+    if (!string.IsNullOrWhiteSpace(callback.ReturnUrl))
+    {
+        var fragment =
+            $"accessToken={Uri.EscapeDataString(callback.AccessToken)}" +
+            $"&expiresAt={Uri.EscapeDataString(callback.ExpiresAt.ToString("o"))}";
+
+        return Results.Redirect($"{callback.ReturnUrl}#{fragment}");
+    }
+
     return Results.Ok(new
     {
-        accessToken = result.Value.AccessToken,
-        expiresAt = result.Value.ExpiresAt,
-        returnUrl = result.Value.ReturnUrl
+        accessToken = callback.AccessToken,
+        expiresAt = callback.ExpiresAt,
+        returnUrl = callback.ReturnUrl
     });
 });
 
