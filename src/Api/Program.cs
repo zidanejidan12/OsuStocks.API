@@ -47,10 +47,13 @@ var swaggerEnabled = builder.Environment.IsDevelopment() || builder.Configuratio
 
 ValidateProductionSecretEnvironmentVariables(builder.Configuration, builder.Environment);
 
-var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-
 builder.Services.AddCors(options =>
 {
+    // Read allowed origins when CORS options are configured (after the host builder has run) rather
+    // than eagerly during startup, so configuration layered on afterwards — e.g. WebApplicationFactory
+    // overrides in integration tests — is honored. In production this resolves the same appsettings values.
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(corsOrigins)
@@ -227,11 +230,25 @@ authGroup.MapGet("/callback", async (
         return result.Error!.ToErrorResult(httpContext);
     }
 
+    var callback = result.Value;
+
+    // The osu! handshake is a top-level browser navigation, so redirect the browser back to the
+    // SPA callback page with the token in the URL fragment (kept out of server logs/history) rather
+    // than returning JSON the frontend cannot consume from a full-page navigation.
+    if (!string.IsNullOrWhiteSpace(callback.ReturnUrl))
+    {
+        var fragment =
+            $"accessToken={Uri.EscapeDataString(callback.AccessToken)}" +
+            $"&expiresAt={Uri.EscapeDataString(callback.ExpiresAt.ToString("o"))}";
+
+        return Results.Redirect($"{callback.ReturnUrl}#{fragment}");
+    }
+
     return Results.Ok(new
     {
-        accessToken = result.Value.AccessToken,
-        expiresAt = result.Value.ExpiresAt,
-        returnUrl = result.Value.ReturnUrl
+        accessToken = callback.AccessToken,
+        expiresAt = callback.ExpiresAt,
+        returnUrl = callback.ReturnUrl
     });
 });
 

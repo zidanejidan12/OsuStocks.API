@@ -33,7 +33,11 @@ public sealed class AddTrackedPlayerCommandHandler(
         try
         {
             var token = await osuOAuthService.GetClientCredentialsTokenAsync(cancellationToken);
-            var osuUser = await osuApiClient.GetUserAsync(request.OsuUserId, token.AccessToken, cancellationToken);
+            var osuUser = await osuApiClient.GetUserAsync(
+                request.OsuUserId,
+                token.AccessToken,
+                includeTopScore: false,
+                cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var actor = string.IsNullOrWhiteSpace(request.Actor) ? "admin" : request.Actor;
