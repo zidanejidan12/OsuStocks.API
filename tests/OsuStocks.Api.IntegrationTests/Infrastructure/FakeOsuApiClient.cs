@@ -18,7 +18,11 @@ internal sealed class FakeOsuApiClient : IOsuApiClient
         return Task.FromResult(Users[0]);
     }
 
-    public Task<OsuUserProfile> GetUserAsync(long osuUserId, string accessToken, CancellationToken cancellationToken = default)
+    public Task<OsuUserProfile> GetUserAsync(
+        long osuUserId,
+        string accessToken,
+        bool includeTopScore = true,
+        CancellationToken cancellationToken = default)
     {
         var user = Users.FirstOrDefault(x => x.OsuUserId == osuUserId);
         if (user is null)
@@ -27,6 +31,20 @@ internal sealed class FakeOsuApiClient : IOsuApiClient
         }
 
         return Task.FromResult(user);
+    }
+
+    public Task<OsuTopScore?> GetTopScoreAsync(
+        long osuUserId,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        var user = Users.FirstOrDefault(x => x.OsuUserId == osuUserId);
+        if (user?.TopScoreId is null)
+        {
+            return Task.FromResult<OsuTopScore?>(null);
+        }
+
+        return Task.FromResult<OsuTopScore?>(new OsuTopScore(user.TopScoreId.Value, user.TopScorePp));
     }
 
     public Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(

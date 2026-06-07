@@ -82,6 +82,9 @@ public static class DependencyInjection
 
         services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();
 
+        services.AddSingleton<OsuApiRateLimiter>();
+        services.AddTransient<OsuApiRateLimitingHandler>();
+
         services.AddHttpClient<IOsuApiClient, OsuApiClient>((serviceProvider, client) =>
         {
             var osuApiOptions = serviceProvider
@@ -97,7 +100,8 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        });
+        })
+        .AddHttpMessageHandler<OsuApiRateLimitingHandler>();
 
         services.AddStackExchangeRedisCache(options =>
         {

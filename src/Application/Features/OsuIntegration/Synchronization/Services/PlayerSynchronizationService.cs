@@ -49,10 +49,35 @@ public sealed class PlayerSynchronizationService(
             var latestProfile = await osuApiClient.GetUserAsync(
                 trackedPlayer.OsuUserId,
                 osuToken.AccessToken,
+                includeTopScore: false,
                 cancellationToken);
 
             var previousSnapshot = await playerSnapshotRepository
                 .GetLatestByTrackedPlayerIdAsync(trackedPlayer.Id, cancellationToken);
+
+            // A new top play always raises total pp, so when pp is unchanged the previous top score
+            // still stands and we can skip the extra best-score API call (one fewer request per player).
+            if (previousSnapshot is null || latestProfile.CurrentPp != previousSnapshot.CurrentPp)
+            {
+                var topScore = await osuApiClient.GetTopScoreAsync(
+                    trackedPlayer.OsuUserId,
+                    osuToken.AccessToken,
+                    cancellationToken);
+
+                latestProfile = latestProfile with
+                {
+                    TopScoreId = topScore?.Id,
+                    TopScorePp = topScore?.Pp
+                };
+            }
+            else
+            {
+                latestProfile = latestProfile with
+                {
+                    TopScoreId = previousSnapshot.TopScoreId,
+                    TopScorePp = previousSnapshot.TopScorePp
+                };
+            }
 
             var comparison = snapshotComparisonService.Compare(
                 previousSnapshot,
