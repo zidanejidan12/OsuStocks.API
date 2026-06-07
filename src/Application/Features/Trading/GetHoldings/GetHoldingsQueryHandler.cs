@@ -18,7 +18,8 @@ public sealed class GetHoldingsQueryHandler(IPortfolioReadRepository portfolioRe
                 x.PlayerName,
                 x.Quantity,
                 x.AveragePrice,
-                x.CurrentPrice))
+                x.CurrentPrice,
+                x.AvatarUrl))
             .ToList();
 
         return Result.Success(new GetHoldingsResponse(items));

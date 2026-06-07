@@ -9,4 +9,5 @@ public sealed record PortfolioHoldingSummaryReadModel(
     decimal CurrentPrice,
     decimal CostBasis,
     decimal CurrentValue,
-    decimal ProfitLoss);
+    decimal ProfitLoss,
+    string? AvatarUrl = null);

@@ -39,11 +39,11 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             topGainer is null
                 ? null
                 : new MarketTopMoverReadModel(
-                    topGainer.StockId, topGainer.PlayerName, topGainer.CurrentPrice, topGainer.PriceChange24h),
+                    topGainer.StockId, topGainer.PlayerName, topGainer.CurrentPrice, topGainer.PriceChange24h, topGainer.AvatarUrl),
             topLoser is null
                 ? null
                 : new MarketTopMoverReadModel(
-                    topLoser.StockId, topLoser.PlayerName, topLoser.CurrentPrice, topLoser.PriceChange24h));
+                    topLoser.StockId, topLoser.PlayerName, topLoser.CurrentPrice, topLoser.PriceChange24h, topLoser.AvatarUrl));
     }
 
     public async Task<MarketStocksPageReadModel> GetStocksAsync(

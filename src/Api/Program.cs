@@ -313,6 +313,7 @@ marketGroup.MapGet("", async (
         {
             ["stockId"] = mover.StockId,
             ["playerName"] = mover.PlayerName,
+            ["avatarUrl"] = mover.AvatarUrl,
             ["currentPrice"] = mover.CurrentPrice,
             ["priceChange24h"] = mover.PriceChange24h
         };

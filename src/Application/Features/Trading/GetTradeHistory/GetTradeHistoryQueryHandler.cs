@@ -25,7 +25,8 @@ public sealed class GetTradeHistoryQueryHandler(ITradeReadRepository tradeReadRe
                 x.UnitPrice,
                 x.TotalAmount,
                 x.ExecutedAt,
-                x.PlayerName))
+                x.PlayerName,
+                x.AvatarUrl))
             .ToList();
 
         return Result.Success(new GetTradeHistoryResponse(items));

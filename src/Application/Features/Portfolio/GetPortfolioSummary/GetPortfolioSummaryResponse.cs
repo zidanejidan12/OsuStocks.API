@@ -15,4 +15,5 @@ public sealed record PortfolioHoldingSummaryItem(
     decimal CurrentPrice,
     decimal CostBasis,
     decimal CurrentValue,
-    decimal ProfitLoss);
+    decimal ProfitLoss,
+    string? AvatarUrl = null);
