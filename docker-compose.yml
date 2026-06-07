@@ -46,7 +46,7 @@ services:
       Cors__AllowedOrigins__0: ${CORS_ORIGIN:-https://app.osustocks.example}
       Security__OAuthReturnUrl__AllowedOrigins__0: ${CORS_ORIGIN:-https://app.osustocks.example}
     ports:
-      - "8080:8080"
+      - "5152:8080"
     depends_on:
       postgres:
         condition: service_healthy
