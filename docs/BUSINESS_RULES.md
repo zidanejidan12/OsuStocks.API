@@ -230,6 +230,74 @@ All violations and suspicious patterns produce structured log entries with:
 
 ---
 
+# Leaderboard Rules
+
+## BR-045 Wealth Leaderboard
+
+Wealth = wallet balance + market value of all positive holdings (`quantity * stock.currentPrice`).
+
+Users are ranked by current wealth, ties broken by username.
+
+Period-over-period change = current wealth minus the most recent wealth snapshot captured at or before the period start (`null` when no snapshot exists for that user).
+
+---
+
+## BR-046 Profit Leaderboard
+
+Profit (net worth) = Wealth − NetDeposits.
+
+NetDeposits = SUM(deposit-type transaction amounts) − SUM(AdminDeduction amounts), where:
+
+* Deposit types = `InitialGrant` + `AdminGrant` + `DailyReward`
+* Deductions = `AdminDeduction`
+
+All wallet-transaction amounts are stored positive; the deduction sum is subtracted.
+
+Users are ranked by profit, ties broken by username. Period-over-period change uses the snapshot `Profit` value (null when no snapshot exists).
+
+---
+
+## BR-047 Trader Leaderboard
+
+Traders are ranked by traded credit volume within the period — `SUM(trade.totalAmount)` for trades executed at or after the period start.
+
+No period-over-period change is reported (the value already represents in-window volume).
+
+---
+
+## BR-048 Wealth Snapshot Capture
+
+A daily Hangfire job (`wealth-snapshot`, runs at 02:30 UTC) captures one `WealthSnapshot` per user.
+
+Each snapshot stores `Wealth`, `NetDeposits`, and `Profit` at capture time.
+
+Snapshots are the historical baseline that powers the period-over-period change on the wealth and profit leaderboards. Redis is not the source of truth; snapshots persist in PostgreSQL (`user_wealth_snapshots`).
+
+---
+
+# Notification Rules
+
+## BR-049 Holder Fan-Out Notifications
+
+When a tracked player's stock experiences a market-relevant event, an in-app notification is created for every user that currently holds shares of that stock (holders-only fan-out).
+
+Triggering domain events:
+
+* `PpIncreased` → "{player} gained pp" notification
+* `TopPlayDetected` → "{player} set a new top play" notification
+
+Behavior:
+
+* Fan-out is skipped when the player has no stock or the stock has no holders.
+* Notifications are created in-process by additional MediatR notification handlers (not a new broker).
+* Users read notifications via `/notifications` (with optional `unread` filter) and mark them read via `/notifications/{id}/read` or `/notifications/read-all`.
+
+Out of scope:
+
+* Real-time push (WebSocket / SSE / web-push) delivery — notifications are persisted and polled, not pushed.
+
+---
+
 # Synchronization Rules
 
 ## BR-050 Polling Strategy
@@ -267,17 +335,17 @@ Changes affect future calculations only.
 
 ---
 
-# Postponed Rules (Phase 1.5)
+# Maintenance Rules
 
 ## BR-060 Market Maintenance
 
 Status:
-Postponed
+Implemented (Phase 1.5)
 
-Administrator may enable maintenance mode.
+Administrator may enable maintenance mode via `/admin/market-settings` (`isMaintenanceMode` flag).
 
 Effects:
 
-* Trading disabled
-* Viewing remains available
+* Trading disabled — buy and sell handlers return a `CONFLICT` error ("Market is in maintenance mode.") while maintenance mode is on.
+* Viewing remains available (market, portfolio, wallet, and leaderboard reads are unaffected).
 
