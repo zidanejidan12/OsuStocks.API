@@ -31,6 +31,9 @@ using OsuStocks.Application.Features.Wallet.GetWallet;
 using OsuStocks.Application.Features.Wallet.GetWalletTransactions;
 using OsuStocks.Application.Features.Admin.MarketSettings.GetMarketSettings;
 using OsuStocks.Application.Features.Admin.MarketSettings.UpdateMarketSettings;
+using OsuStocks.Application.Features.Notifications.GetNotifications;
+using OsuStocks.Application.Features.Notifications.MarkNotificationRead;
+using OsuStocks.Application.Features.Notifications.MarkAllNotificationsRead;
 using OsuStocks.Application.Features.Trading.SellStock;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
@@ -817,6 +820,82 @@ walletGroup.MapGet("/transactions", async (
 
     return Results.Ok(new { items = result.Value.Items });
 });
+var notificationsGroup = app.MapGroup("/api/v1/notifications")
+    .RequireAuthorization();
+
+notificationsGroup.MapGet("", async (
+    bool? unread,
+    int? page,
+    int? pageSize,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetNotificationsQuery(
+        userId,
+        unread ?? false,
+        page ?? 1,
+        pageSize ?? 25), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items,
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize
+    });
+});
+
+notificationsGroup.MapPost("/{id:guid}/read", async (
+    Guid id,
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new MarkNotificationReadCommand(userId, id), cancellationToken);
+    if (!result.IsSuccess)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { success = true });
+});
+
+notificationsGroup.MapPost("/read-all", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new MarkAllNotificationsReadCommand(userId), cancellationToken);
+    if (!result.IsSuccess)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new { markedRead = result.Value });
+});
+
 var adminGroup = app.MapGroup("/api/v1/admin")
     .RequireAuthorization(policy => policy.RequireRole(UserRole.Admin.ToString()));
 
