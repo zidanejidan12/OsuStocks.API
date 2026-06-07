@@ -81,7 +81,9 @@ public sealed class MarketEngineIntegrationTests(PostgresTestcontainerFixture fi
                 .SingleAsync(x => x.Id == stockId);
 
             Assert.Equal(changed.NewPrice, updatedStock.CurrentPrice);
-            Assert.Equal(occurredAt, updatedStock.LastUpdated);
+            // PostgreSQL timestamptz stores microsecond precision; .NET DateTimeOffset keeps 100ns ticks.
+            // Compare with a 1-microsecond tolerance to account for the round-trip truncation.
+            Assert.Equal(occurredAt, updatedStock.LastUpdated, TimeSpan.FromTicks(10));
 
             var history = await dbContext.StockPriceHistory
                 .AsNoTracking()
@@ -149,7 +151,10 @@ public sealed class MarketEngineIntegrationTests(PostgresTestcontainerFixture fi
 
         Assert.NotNull(changed);
         Assert.Equal(PriceChangeReason.Decay, changed!.Reason);
-        Assert.Equal(1m, changed.NewPrice);
+        // Seeded 1.2 with the production 0.5% inactivity decay -> 1.2 * 0.995 = 1.1940, which is above
+        // the price floor of 1, so no clamping occurs here. (Floor clamping itself is covered by the
+        // unit test MarketPriceEngineTests.Calculate_Inactivity_EnforcesPriceFloor, which uses a 50% decay.)
+        Assert.Equal(1.194m, changed.NewPrice);
     }
 }
 

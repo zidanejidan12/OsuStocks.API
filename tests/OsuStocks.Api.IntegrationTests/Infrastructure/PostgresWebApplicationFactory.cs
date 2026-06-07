@@ -49,7 +49,10 @@ internal sealed class PostgresWebApplicationFactory(
                 ["OsuOAuth:Scopes:0"] = "public",
                 ["OsuOAuth:Scopes:1"] = "identify",
                 ["OsuApi:BaseUrl"] = "https://osu.ppy.sh/api/v2/",
-                ["Security:EnableSwagger"] = "false"
+                ["Security:EnableSwagger"] = "false",
+                // Disable the per-stock trade cooldown so tests can issue back-to-back trades of the
+                // same stock (e.g. the buy-then-sell flow). The cooldown is a production anti-abuse rule.
+                ["AntiAbuse:TradeCooldownSeconds"] = "0"
             };
 
             configBuilder.AddInMemoryCollection(inMemorySettings);

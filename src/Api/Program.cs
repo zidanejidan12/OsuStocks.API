@@ -47,10 +47,13 @@ var swaggerEnabled = builder.Environment.IsDevelopment() || builder.Configuratio
 
 ValidateProductionSecretEnvironmentVariables(builder.Configuration, builder.Environment);
 
-var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-
 builder.Services.AddCors(options =>
 {
+    // Read allowed origins when CORS options are configured (after the host builder has run) rather
+    // than eagerly during startup, so configuration layered on afterwards — e.g. WebApplicationFactory
+    // overrides in integration tests — is honored. In production this resolves the same appsettings values.
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(corsOrigins)
