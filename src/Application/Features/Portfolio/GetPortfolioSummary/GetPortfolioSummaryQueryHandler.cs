@@ -24,7 +24,8 @@ public sealed class GetPortfolioSummaryQueryHandler(IPortfolioReadRepository por
                 x.CurrentPrice,
                 x.CostBasis,
                 x.CurrentValue,
-                x.ProfitLoss))
+                x.ProfitLoss,
+                x.AvatarUrl))
             .ToList();
 
         var totalCurrentValue = holdings.Sum(x => x.CurrentValue);

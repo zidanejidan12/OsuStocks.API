@@ -52,6 +52,7 @@ public sealed class HandleOsuCallbackCommandHandler(
                     OsuUserId = osuUser.OsuUserId,
                     Username = osuUser.Username,
                     AvatarUrl = osuUser.AvatarUrl,
+                    CountryCode = osuUser.CountryCode,
                     Role = UserRole.User,
                     CreatedAt = DateTimeOffset.UtcNow,
                     CreatedBy = "oauth",
@@ -93,6 +94,7 @@ public sealed class HandleOsuCallbackCommandHandler(
             {
                 user.Username = osuUser.Username;
                 user.AvatarUrl = osuUser.AvatarUrl;
+                user.CountryCode = osuUser.CountryCode;
                 user.LastLoginAt = DateTimeOffset.UtcNow;
                 user.UpdatedAt = DateTimeOffset.UtcNow;
                 user.UpdatedBy = "oauth";

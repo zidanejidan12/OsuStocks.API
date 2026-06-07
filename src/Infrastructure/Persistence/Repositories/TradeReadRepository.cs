@@ -26,7 +26,8 @@ internal sealed class TradeReadRepository(AppDbContext dbContext) : ITradeReadRe
                 x.UnitPrice,
                 x.TotalAmount,
                 x.ExecutedAt,
-                x.Stock.TrackedPlayer.Username))
+                x.Stock.TrackedPlayer.Username,
+                x.Stock.TrackedPlayer.AvatarUrl))
             .ToListAsync(cancellationToken);
     }
 }

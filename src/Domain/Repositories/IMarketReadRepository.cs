@@ -8,4 +8,6 @@ public interface IMarketReadRepository
     Task<MarketStocksPageReadModel> GetStocksAsync(MarketStocksQuerySpec spec, CancellationToken cancellationToken = default);
     Task<MarketStockDetailsReadModel?> GetStockDetailsAsync(Guid stockId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MarketStockHistoryPointReadModel>> GetStockHistoryAsync(Guid stockId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockCandleReadModel>> GetStockCandlesAsync(Guid stockId, HistoryRangeSpec spec, CancellationToken cancellationToken = default);
+    Task<StockAnalyticsReadModel?> GetStockAnalyticsAsync(Guid stockId, CancellationToken cancellationToken = default);
 }

@@ -10,4 +10,5 @@ public sealed record MarketTopMoverResponse(
     Guid StockId,
     string PlayerName,
     decimal CurrentPrice,
-    decimal PriceChange24h);
+    decimal PriceChange24h,
+    string? AvatarUrl = null);

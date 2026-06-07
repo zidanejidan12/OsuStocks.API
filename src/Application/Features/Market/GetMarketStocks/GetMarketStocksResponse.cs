@@ -9,6 +9,8 @@ public sealed record GetMarketStocksResponse(
 public sealed record MarketStockListItemResponse(
     Guid StockId,
     string PlayerName,
+    string? AvatarUrl,
+    string? CountryCode,
     decimal CurrentPrice,
     long Volume,
     decimal PriceChange24h);

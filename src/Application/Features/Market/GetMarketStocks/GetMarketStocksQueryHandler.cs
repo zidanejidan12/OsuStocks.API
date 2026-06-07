@@ -20,6 +20,8 @@ public sealed class GetMarketStocksQueryHandler(IMarketReadRepository marketRead
             result.Items.Select(x => new MarketStockListItemResponse(
                 x.StockId,
                 x.PlayerName,
+                x.AvatarUrl,
+                x.CountryCode,
                 x.CurrentPrice,
                 x.Volume,
                 x.PriceChange24h)).ToList(),

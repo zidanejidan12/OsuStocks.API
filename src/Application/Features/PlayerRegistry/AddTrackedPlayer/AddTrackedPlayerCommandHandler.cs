@@ -47,6 +47,8 @@ public sealed class AddTrackedPlayerCommandHandler(
                 Id = Guid.NewGuid(),
                 OsuUserId = osuUser.OsuUserId,
                 Username = osuUser.Username,
+                AvatarUrl = osuUser.AvatarUrl,
+                CountryCode = osuUser.CountryCode,
                 TrackingTier = request.TrackingTier,
                 IsActive = true,
                 CreatedAt = now,

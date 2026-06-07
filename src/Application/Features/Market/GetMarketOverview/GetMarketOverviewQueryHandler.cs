@@ -22,13 +22,15 @@ public sealed class GetMarketOverviewQueryHandler(IMarketReadRepository marketRe
                     overview.TopGainer.StockId,
                     overview.TopGainer.PlayerName,
                     overview.TopGainer.CurrentPrice,
-                    overview.TopGainer.PriceChange24h),
+                    overview.TopGainer.PriceChange24h,
+                    overview.TopGainer.AvatarUrl),
             overview.TopLoser is null
                 ? null
                 : new MarketTopMoverResponse(
                     overview.TopLoser.StockId,
                     overview.TopLoser.PlayerName,
                     overview.TopLoser.CurrentPrice,
-                    overview.TopLoser.PriceChange24h)));
+                    overview.TopLoser.PriceChange24h,
+                    overview.TopLoser.AvatarUrl)));
     }
 }

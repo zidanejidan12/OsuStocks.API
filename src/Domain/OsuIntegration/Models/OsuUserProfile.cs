@@ -7,4 +7,5 @@ public sealed record OsuUserProfile(
     decimal CurrentPp,
     int? GlobalRank,
     long? TopScoreId,
-    decimal? TopScorePp);
+    decimal? TopScorePp,
+    string? CountryCode = null);

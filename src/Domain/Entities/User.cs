@@ -8,6 +8,7 @@ public sealed class User
     public long OsuUserId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? CountryCode { get; set; }
     public UserRole Role { get; set; } = UserRole.User;
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
