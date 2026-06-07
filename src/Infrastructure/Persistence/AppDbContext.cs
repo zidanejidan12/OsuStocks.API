@@ -19,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PlayerSnapshot> PlayerSnapshots => Set<PlayerSnapshot>();
     public DbSet<MarketEvent> MarketEvents => Set<MarketEvent>();
     public DbSet<MarketSettings> MarketSettings => Set<MarketSettings>();
+    public DbSet<WealthSnapshot> WealthSnapshots => Set<WealthSnapshot>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

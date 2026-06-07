@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OsuStocks.Application.Common.Caching;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Infrastructure.Persistence;
@@ -68,6 +69,12 @@ internal sealed class PostgresWebApplicationFactory(
             services.RemoveAll<IOsuApiClient>();
             services.AddSingleton<IOsuOAuthService, FakeOsuOAuthService>();
             services.AddSingleton<IOsuApiClient, FakeOsuApiClient>();
+
+            // Replace the Redis-backed read-model cache with a pass-through so cached endpoints
+            // (leaderboards, trending) always hit the per-test database — deterministic, and free of
+            // any shared-Redis stale-cache risk across tests/runs.
+            services.RemoveAll<IReadModelCache>();
+            services.AddScoped<IReadModelCache, NoOpReadModelCache>();
 
             services.AddAuthentication(options =>
             {

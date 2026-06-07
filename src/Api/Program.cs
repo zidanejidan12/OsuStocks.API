@@ -21,6 +21,8 @@ using OsuStocks.Application.Features.Market.GetMarketOverview;
 using OsuStocks.Application.Features.Market.GetMarketStocks;
 using OsuStocks.Application.Features.Market.GetMarketStockDetails;
 using OsuStocks.Application.Features.Market.GetMarketStockHistory;
+using OsuStocks.Application.Features.Market.GetStockCandles;
+using OsuStocks.Application.Features.Market.GetStockAnalytics;
 using OsuStocks.Application.Features.Trading.BuyStock;
 using OsuStocks.Application.Features.Trading.GetHoldings;
 using OsuStocks.Application.Features.Trading.GetTradeHistory;
@@ -279,6 +281,8 @@ authGroup.MapGet("/me", async (
         userId = result.Value.UserId,
         osuUserId = result.Value.OsuUserId,
         username = result.Value.Username,
+        avatarUrl = result.Value.AvatarUrl,
+        countryCode = result.Value.CountryCode,
         role = result.Value.Role
     });
 })
@@ -368,6 +372,8 @@ marketGroup.MapGet("/stocks/{stockId:guid}", async (
     {
         stockId = result.Value.StockId,
         playerName = result.Value.PlayerName,
+        avatarUrl = result.Value.AvatarUrl,
+        countryCode = result.Value.CountryCode,
         currentPrice = result.Value.CurrentPrice,
         volume = result.Value.Volume,
         priceChange24h = result.Value.PriceChange24h
@@ -376,10 +382,34 @@ marketGroup.MapGet("/stocks/{stockId:guid}", async (
 
 marketGroup.MapGet("/stocks/{stockId:guid}/history", async (
     Guid stockId,
+    string? range,
     ISender sender,
     HttpContext httpContext,
     CancellationToken cancellationToken) =>
 {
+    if (!string.IsNullOrWhiteSpace(range))
+    {
+        var candlesResult = await sender.Send(new GetStockCandlesQuery(stockId, range), cancellationToken);
+        if (!candlesResult.IsSuccess || candlesResult.Value is null)
+        {
+            return candlesResult.Error!.ToErrorResult(httpContext);
+        }
+
+        return Results.Ok(new
+        {
+            range = candlesResult.Value.Range,
+            candles = candlesResult.Value.Items.Select(x => new
+            {
+                bucketStart = x.BucketStart,
+                open = x.Open,
+                high = x.High,
+                low = x.Low,
+                close = x.Close,
+                volume = x.Volume
+            })
+        });
+    }
+
     var result = await sender.Send(new GetMarketStockHistoryQuery(stockId), cancellationToken);
     if (!result.IsSuccess || result.Value is null)
     {
@@ -392,6 +422,227 @@ marketGroup.MapGet("/stocks/{stockId:guid}/history", async (
         price = x.Price
     }));
 });
+
+marketGroup.MapGet("/stocks/{stockId:guid}/analytics", async (
+    Guid stockId,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new GetStockAnalyticsQuery(stockId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        volume24hShares = result.Value.Volume24hShares,
+        volume24hValue = result.Value.Volume24hValue,
+        volume7dShares = result.Value.Volume7dShares,
+        volume7dValue = result.Value.Volume7dValue,
+        volatility7d = result.Value.Volatility7d,
+        ownershipCount = result.Value.OwnershipCount,
+        activeTraders24h = result.Value.ActiveTraders24h,
+        marketCap = result.Value.MarketCap
+    });
+});
+
+marketGroup.MapGet("/events", async (
+    int? page,
+    int? pageSize,
+    string? type,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new OsuStocks.Application.Features.Market.GetMarketActivityFeed.GetMarketActivityFeedQuery(
+        page ?? 1,
+        pageSize ?? 25,
+        type), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items.Select(x => new
+        {
+            stockId = x.StockId,
+            playerName = x.PlayerName,
+            avatarUrl = x.AvatarUrl,
+            countryCode = x.CountryCode,
+            reason = x.Reason,
+            description = x.Description,
+            percentChange = x.PercentChange,
+            newPrice = x.NewPrice,
+            occurredAt = x.OccurredAt
+        }),
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize
+    });
+});
+
+marketGroup.MapGet("/events/{stockId:guid}", async (
+    Guid stockId,
+    int? page,
+    int? pageSize,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new OsuStocks.Application.Features.Market.GetStockActivityFeed.GetStockActivityFeedQuery(
+        stockId,
+        page ?? 1,
+        pageSize ?? 25), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items.Select(x => new
+        {
+            stockId = x.StockId,
+            playerName = x.PlayerName,
+            avatarUrl = x.AvatarUrl,
+            countryCode = x.CountryCode,
+            reason = x.Reason,
+            description = x.Description,
+            percentChange = x.PercentChange,
+            newPrice = x.NewPrice,
+            occurredAt = x.OccurredAt
+        }),
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize
+    });
+});
+
+marketGroup.MapGet("/trending", async (
+    string? window,
+    int? limit,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new OsuStocks.Application.Features.Market.GetTrending.GetTrendingQuery(
+        window,
+        limit ?? 10), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    object MapSection(IReadOnlyList<OsuStocks.Application.Features.Market.GetTrending.TrendingStockResponse> section) =>
+        section.Select(x => new
+        {
+            stockId = x.StockId,
+            playerName = x.PlayerName,
+            avatarUrl = x.AvatarUrl,
+            countryCode = x.CountryCode,
+            metricValue = x.MetricValue,
+            currentPrice = x.CurrentPrice
+        });
+
+    return Results.Ok(new
+    {
+        mostBought = MapSection(result.Value.MostBought),
+        mostSold = MapSection(result.Value.MostSold),
+        fastestRising = MapSection(result.Value.FastestRising),
+        fastestFalling = MapSection(result.Value.FastestFalling),
+        highestVolume = MapSection(result.Value.HighestVolume)
+    });
+});
+
+var leaderboardGroup = app.MapGroup("/api/v1/leaderboards")
+    .RequireAuthorization();
+
+leaderboardGroup.MapGet("/wealth", async (
+    string? period,
+    int? page,
+    int? pageSize,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new OsuStocks.Application.Features.Leaderboards.GetWealthLeaderboard.GetWealthLeaderboardQuery(
+        period,
+        page ?? 1,
+        pageSize ?? 25), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items,
+        period = result.Value.Period,
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize
+    });
+});
+
+leaderboardGroup.MapGet("/profit", async (
+    string? period,
+    int? page,
+    int? pageSize,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new OsuStocks.Application.Features.Leaderboards.GetProfitLeaderboard.GetProfitLeaderboardQuery(
+        period,
+        page ?? 1,
+        pageSize ?? 25), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items,
+        period = result.Value.Period,
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize
+    });
+});
+
+leaderboardGroup.MapGet("/traders", async (
+    string? period,
+    int? page,
+    int? pageSize,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    var result = await sender.Send(new OsuStocks.Application.Features.Leaderboards.GetTraderLeaderboard.GetTraderLeaderboardQuery(
+        period,
+        page ?? 1,
+        pageSize ?? 25), cancellationToken);
+
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items,
+        period = result.Value.Period,
+        page = result.Value.Page,
+        pageSize = result.Value.PageSize
+    });
+});
+
 var tradingGroup = app.MapGroup("/api/v1/trading")
     .RequireAuthorization()
     .RequireRateLimiting("trading");

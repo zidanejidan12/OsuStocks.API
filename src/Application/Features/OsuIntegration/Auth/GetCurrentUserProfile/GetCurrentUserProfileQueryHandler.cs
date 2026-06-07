@@ -21,6 +21,8 @@ public sealed class GetCurrentUserProfileQueryHandler(IUserRepository userReposi
             user.Id,
             user.OsuUserId,
             user.Username,
+            user.AvatarUrl,
+            user.CountryCode,
             user.Role.ToString()));
     }
 }
