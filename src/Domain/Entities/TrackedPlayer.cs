@@ -7,6 +7,8 @@ public sealed class TrackedPlayer
     public Guid Id { get; set; }
     public long OsuUserId { get; set; }
     public string Username { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
+    public string? CountryCode { get; set; }
     public TrackingTier TrackingTier { get; set; } = TrackingTier.Tier3;
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }

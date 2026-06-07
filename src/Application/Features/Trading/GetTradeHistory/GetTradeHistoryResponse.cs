@@ -10,4 +10,5 @@ public sealed record TradeHistoryItemResponse(
     decimal UnitPrice,
     decimal TotalAmount,
     DateTimeOffset ExecutedAt,
-    string? PlayerName);
+    string? PlayerName,
+    string? AvatarUrl = null);

@@ -74,6 +74,8 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
             .Select(x => new MarketStockListItemReadModel(
                 x.StockId,
                 x.PlayerName,
+                x.AvatarUrl,
+                x.CountryCode,
                 x.CurrentPrice,
                 x.Volume,
                 x.PriceChange24h))
@@ -96,6 +98,23 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
         }
 
         return Task.FromResult<IReadOnlyList<MarketStockHistoryPointReadModel>>(history.OrderBy(x => x.Timestamp).ToList());
+    }
+
+    public Task<IReadOnlyList<StockCandleReadModel>> GetStockCandlesAsync(Guid stockId, HistoryRangeSpec spec, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<StockCandleReadModel>>([]);
+    }
+
+    public Task<StockAnalyticsReadModel?> GetStockAnalyticsAsync(Guid stockId, CancellationToken cancellationToken = default)
+    {
+        var stock = _stocks.FirstOrDefault(x => x.StockId == stockId);
+        if (stock is null)
+        {
+            return Task.FromResult<StockAnalyticsReadModel?>(null);
+        }
+
+        return Task.FromResult<StockAnalyticsReadModel?>(
+            new StockAnalyticsReadModel(0L, 0m, 0L, 0m, 0m, 0, 0, 0m));
     }
 
     private static MarketTopMoverReadModel ToTopMover(MarketStockDetailsReadModel stock)

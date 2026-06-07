@@ -23,7 +23,8 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
                 x.Stock.CurrentPrice,
                 x.AveragePrice * x.Quantity,
                 x.Stock.CurrentPrice * x.Quantity,
-                (x.Stock.CurrentPrice * x.Quantity) - (x.AveragePrice * x.Quantity)))
+                (x.Stock.CurrentPrice * x.Quantity) - (x.AveragePrice * x.Quantity),
+                x.Stock.TrackedPlayer.AvatarUrl))
             .ToListAsync(cancellationToken);
     }
 
@@ -41,7 +42,8 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
                 x.Stock.TrackedPlayer.Username,
                 x.Quantity,
                 x.AveragePrice,
-                x.Stock.CurrentPrice))
+                x.Stock.CurrentPrice,
+                x.Stock.TrackedPlayer.AvatarUrl))
             .ToListAsync(cancellationToken);
     }
 }

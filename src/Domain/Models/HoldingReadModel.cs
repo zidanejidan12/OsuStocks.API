@@ -6,4 +6,5 @@ public sealed record HoldingReadModel(
     string? PlayerName,
     int Quantity,
     decimal AveragePrice,
-    decimal CurrentPrice);
+    decimal CurrentPrice,
+    string? AvatarUrl = null);

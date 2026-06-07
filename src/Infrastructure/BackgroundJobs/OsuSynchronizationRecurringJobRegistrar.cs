@@ -26,5 +26,10 @@ public sealed class OsuSynchronizationRecurringJobRegistrar(IRecurringJobManager
             "inactivity-decay",
             job => job.RunAsync(),
             Cron.Daily(3, 0));
+
+        recurringJobManager.AddOrUpdate<WealthSnapshotRecurringJob>(
+            "wealth-snapshot",
+            job => job.RunAsync(),
+            Cron.Daily(2, 30));
     }
 }

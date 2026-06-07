@@ -3,6 +3,7 @@ using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OsuStocks.Application.Common.Caching;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.Market.Interfaces;
@@ -13,6 +14,7 @@ using OsuStocks.Infrastructure.Authentication;
 using OsuStocks.Infrastructure.Market;
 using OsuStocks.Infrastructure.Market.Options;
 using OsuStocks.Infrastructure.BackgroundJobs;
+using OsuStocks.Infrastructure.Caching;
 using OsuStocks.Infrastructure.OsuIntegration.Api;
 using OsuStocks.Infrastructure.OsuIntegration.OAuth;
 using OsuStocks.Infrastructure.OsuIntegration.Options;
@@ -64,7 +66,12 @@ public static class DependencyInjection
         services.AddScoped<IPlayerSnapshotRepository, PlayerSnapshotRepository>();
         services.AddScoped<IMarketEventRepository, MarketEventRepository>();
         services.AddScoped<IMarketReadRepository, MarketReadRepository>();
+        services.AddScoped<IMarketActivityReadRepository, MarketActivityReadRepository>();
+        services.AddScoped<IReadModelCache, RedisReadModelCache>();
         services.AddScoped<IMarketSettingsRepository, MarketSettingsRepository>();
+        services.AddScoped<IWealthSnapshotRepository, WealthSnapshotRepository>();
+        services.AddScoped<ILeaderboardReadRepository, LeaderboardReadRepository>();
+        services.AddScoped<ITrendingReadRepository, TrendingReadRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
@@ -78,6 +85,7 @@ public static class DependencyInjection
 
         services.AddScoped<OsuSynchronizationRecurringJob>();
         services.AddScoped<InactivityDecayRecurringJob>();
+        services.AddScoped<WealthSnapshotRecurringJob>();
         services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
 
         services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();

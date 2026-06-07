@@ -4,4 +4,5 @@ public sealed record MarketTopMoverReadModel(
     Guid StockId,
     string PlayerName,
     decimal CurrentPrice,
-    decimal PriceChange24h);
+    decimal PriceChange24h,
+    string? AvatarUrl = null);

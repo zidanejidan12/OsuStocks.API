@@ -346,6 +346,10 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_stock_history_created");
+
                     b.HasIndex("StockId", "CreatedAt")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_stock_history_stock_created_desc");
@@ -359,6 +363,16 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("avatar_url");
+
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("country_code");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -454,6 +468,10 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("StockId")
                         .HasDatabaseName("ix_trade_stock");
 
+                    b.HasIndex("StockId", "ExecutedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_trade_stock_executed");
+
                     b.HasIndex("UserId", "ExecutedAt")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_trade_user_executed_desc");
@@ -472,6 +490,11 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)")
                         .HasColumnName("avatar_url");
+
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("country_code");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -610,6 +633,45 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_wallet_transactions_wallet_created_desc");
 
                     b.ToTable("wallet_transactions", (string)null);
+                });
+
+            modelBuilder.Entity("OsuStocks.Domain.Entities.WealthSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("captured_at");
+
+                    b.Property<decimal>("NetDeposits")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("net_deposits");
+
+                    b.Property<decimal>("Profit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("profit");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<decimal>("Wealth")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("wealth");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CapturedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_wealth_snapshot_user_captured_desc");
+
+                    b.ToTable("user_wealth_snapshots", (string)null);
                 });
 
             modelBuilder.Entity("OsuStocks.Domain.Entities.Holding", b =>

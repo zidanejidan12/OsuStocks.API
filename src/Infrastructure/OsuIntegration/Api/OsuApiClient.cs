@@ -58,7 +58,8 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
                 user.Statistics?.Pp ?? 0m,
                 user.Statistics?.GlobalRank,
                 null,
-                null))
+                null,
+                user.CountryCode))
             .ToList();
     }
 
@@ -82,7 +83,8 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
             user.Statistics?.Pp ?? 0m,
             user.Statistics?.GlobalRank,
             topScore?.Id,
-            topScore?.Pp);
+            topScore?.Pp,
+            user.CountryCode);
     }
 
     private async Task<OsuTopScoreResponse?> GetTopScoreInternalAsync(
@@ -136,6 +138,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
 
         [JsonPropertyName("avatar_url")]
         public string? AvatarUrl { get; init; }
+
+        [JsonPropertyName("country_code")]
+        public string? CountryCode { get; init; }
 
         public OsuStatisticsResponse? Statistics { get; init; }
     }
