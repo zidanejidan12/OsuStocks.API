@@ -26,6 +26,7 @@ Attributes:
 * OsuUserId
 * Username
 * AvatarUrl
+* CountryCode
 * Role
 * CreatedAt
 * LastLoginAt
@@ -98,6 +99,8 @@ Attributes:
 * TrackedPlayerId
 * OsuUserId
 * Username
+* AvatarUrl
+* CountryCode
 * TrackingTier
 * IsActive
 * CreatedAt
@@ -243,6 +246,76 @@ Attributes:
 Rules:
 
 * Created only by synchronization jobs.
+
+---
+
+# Entity: MarketEvent
+
+Purpose:
+
+Append-only feed of market activity for a stock (Phase 2 event feed),
+exposed via the market events endpoints.
+
+Attributes:
+
+* Id
+* StockId
+* EventType
+* Payload (JSON)
+* CreatedAt
+
+Rules:
+
+* Append-only; immutable after creation.
+
+---
+
+# Entity: WealthSnapshot
+
+Purpose:
+
+Records a point-in-time snapshot of a user's total wealth, used for the
+daily wealth-snapshot job and leaderboards / profit tracking.
+
+Attributes:
+
+* Id
+* UserId
+* CapturedAt
+* Wealth
+* NetDeposits
+* Profit
+
+Rules:
+
+* Created by the daily wealth-snapshot job (one per user per capture).
+* Immutable after creation.
+* Wealth = wallet balance + market value of holdings; Profit = Wealth − NetDeposits.
+
+---
+
+# Entity: Notification
+
+Purpose:
+
+A per-user notification produced by holder fan-out (e.g. price/market events),
+read via the notifications list/unread endpoints and marked read.
+
+Attributes:
+
+* Id
+* UserId
+* Type
+* Title
+* Body
+* Data (optional, JSON payload)
+* IsRead
+* CreatedAt
+
+Rules:
+
+* One row per recipient user (fan-out to holders).
+* Mutable only via mark-read (IsRead toggled true); otherwise immutable.
 
 ---
 

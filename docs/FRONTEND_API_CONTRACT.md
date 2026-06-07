@@ -1,7 +1,7 @@
 # Frontend API Contract
 
 > Source of truth: actual implementation in `src/Api/Program.cs` and `src/Application/Features/`.
-> Last updated: 2026-06-06.
+> Last updated: 2026-06-07.
 
 ---
 
@@ -25,7 +25,9 @@ The API uses **JWT Bearer tokens** obtained via the osu! OAuth flow.
 1. Redirect the user to `GET /api/v1/auth/login` (optionally with `?returnUrl=...`).
 2. The API returns a **302 redirect** to osu!'s authorization page.
 3. After the user authorizes, osu! redirects back to the API callback.
-4. The callback returns a JSON response with the JWT token.
+4. The callback behavior depends on whether a `returnUrl` was supplied at login:
+   - **With `returnUrl`** (the normal SPA flow): the callback responds with a **302 redirect** to `<returnUrl>#accessToken=...&expiresAt=...` — the token is placed in the URL **fragment** (not the query string, so it stays out of server logs/history). The frontend reads the fragment and strips it.
+   - **Without `returnUrl`**: the callback responds with **`200 OK`** and a JSON body containing the token.
 5. Include the token in subsequent requests:
 
 ```
@@ -86,7 +88,11 @@ Paginated endpoints accept `page` and `pageSize` query parameters and return:
 - `page` — 1-based, default `1`
 - `pageSize` — default `25`, max `100`
 
-Currently only `GET /market/stocks` returns the full pagination envelope. Other list endpoints return `{ "items": [...] }` without `page`/`totalCount`.
+Pagination envelopes vary by endpoint:
+
+- `GET /market/stocks` returns the **full** envelope: `items`, `page`, `pageSize`, `totalCount`.
+- `GET /market/events`, `GET /market/events/{stockId}`, `GET /notifications`, and the three `GET /leaderboards/*` endpoints return `items`, `page`, `pageSize` (no `totalCount`). Leaderboards also include `period`.
+- Other list endpoints (`/trading/history`, `/portfolio/holdings`, `/wallet/transactions`, `/admin/tracked-players`, `/admin/tracked-players/search`) return only `{ "items": [...] }`.
 
 ### Decimal Precision
 
@@ -160,13 +166,23 @@ Handles the osu! OAuth callback. Exchanges the authorization code for a JWT.
 | `code` | string | Yes | OAuth authorization code (max 512 chars) |
 | `state` | string | Yes | OAuth state token (max 128 chars) |
 
-**Response:** `200 OK`
+**Response — when a `returnUrl` was provided at login:** `302 Found`
+
+The browser is redirected to the SPA callback page with the token in the URL **fragment**:
+
+```
+Location: https://app.example.com/dashboard#accessToken=eyJhbGciOiJIUzI1NiIs...&expiresAt=2026-06-06T15%3A00%3A00.0000000%2B00%3A00
+```
+
+Both fragment values are URL-encoded. The frontend parses `window.location.hash`, stores the token, and clears the fragment.
+
+**Response — when no `returnUrl` was provided:** `200 OK`
 
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
   "expiresAt": "2026-06-06T15:00:00+00:00",
-  "returnUrl": "https://app.example.com/dashboard"
+  "returnUrl": null
 }
 ```
 
@@ -174,7 +190,7 @@ Handles the osu! OAuth callback. Exchanges the authorization code for a JWT.
 |-------|------|----------|-------------|
 | `accessToken` | string | No | JWT token for subsequent requests |
 | `expiresAt` | datetime | No | Token expiration timestamp |
-| `returnUrl` | string | Yes | The `returnUrl` from the login step, if provided |
+| `returnUrl` | string | Yes | Always `null` in this branch (a non-empty `returnUrl` triggers the 302 redirect instead) |
 
 ---
 
@@ -194,16 +210,20 @@ Returns the authenticated user's profile.
   "userId": "b0000000-0000-0000-0000-000000000001",
   "osuUserId": 4787150,
   "username": "Cookiezi",
+  "avatarUrl": "https://a.ppy.sh/124493",
+  "countryCode": "KR",
   "role": "Admin"
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `userId` | guid | Internal user ID |
-| `osuUserId` | long | osu! user ID |
-| `username` | string | osu! username |
-| `role` | string | `"User"` or `"Admin"` |
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `userId` | guid | No | Internal user ID |
+| `osuUserId` | long | No | osu! user ID |
+| `username` | string | No | osu! username |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `countryCode` | string | Yes | ISO country code (e.g. `"KR"`) |
+| `role` | string | No | `"User"` or `"Admin"` |
 
 ---
 
@@ -224,12 +244,14 @@ Returns the market overview with total stocks, volume, and top movers.
   "topGainer": {
     "stockId": "f0000000-0000-0000-0000-000000000003",
     "playerName": "mrekk",
+    "avatarUrl": "https://a.ppy.sh/7562902",
     "currentPrice": 175.25,
     "priceChange24h": 5.25
   },
   "topLoser": {
     "stockId": "f0000000-0000-0000-0000-000000000008",
     "playerName": "Aricin",
+    "avatarUrl": "https://a.ppy.sh/8967394",
     "currentPrice": 25.00,
     "priceChange24h": -5.00
   }
@@ -240,17 +262,18 @@ Returns the market overview with total stocks, volume, and top movers.
 |-------|------|----------|-------------|
 | `totalStocks` | int | No | Number of stocks in the market |
 | `totalVolume` | long | No | Total trade volume |
-| `topGainer` | object | Yes | Stock with highest 24h price change |
-| `topLoser` | object | Yes | Stock with lowest 24h price change |
+| `topGainer` | object | Yes | Stock with highest 24h price change (empty object `{}` when none) |
+| `topLoser` | object | Yes | Stock with lowest 24h price change (empty object `{}` when none) |
 
 `topGainer` / `topLoser` fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `stockId` | guid | Stock ID |
-| `playerName` | string | osu! player name |
-| `currentPrice` | decimal | Current stock price |
-| `priceChange24h` | decimal | Absolute price change in last 24h |
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `stockId` | guid | No | Stock ID |
+| `playerName` | string | No | osu! player name |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `currentPrice` | decimal | No | Current stock price |
+| `priceChange24h` | decimal | No | Absolute price change in last 24h |
 
 ---
 
@@ -279,6 +302,8 @@ Returns a paginated, sortable, searchable list of stocks.
     {
       "stockId": "f0000000-0000-0000-0000-000000000003",
       "playerName": "mrekk",
+      "avatarUrl": "https://a.ppy.sh/7562902",
+      "countryCode": "AU",
       "currentPrice": 175.25,
       "volume": 8,
       "priceChange24h": 5.25
@@ -290,13 +315,15 @@ Returns a paginated, sortable, searchable list of stocks.
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `stockId` | guid | Stock ID |
-| `playerName` | string | osu! player name |
-| `currentPrice` | decimal | Current price |
-| `volume` | long | Trade volume |
-| `priceChange24h` | decimal | Absolute price change in last 24h |
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `stockId` | guid | No | Stock ID |
+| `playerName` | string | No | osu! player name |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `countryCode` | string | Yes | ISO country code |
+| `currentPrice` | decimal | No | Current price |
+| `volume` | long | No | Trade volume |
+| `priceChange24h` | decimal | No | Absolute price change in last 24h |
 
 ---
 
@@ -316,11 +343,23 @@ Returns details for a single stock.
 {
   "stockId": "f0000000-0000-0000-0000-000000000003",
   "playerName": "mrekk",
+  "avatarUrl": "https://a.ppy.sh/7562902",
+  "countryCode": "AU",
   "currentPrice": 175.25,
   "volume": 8,
   "priceChange24h": 5.25
 }
 ```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `stockId` | guid | No | Stock ID |
+| `playerName` | string | No | osu! player name |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `countryCode` | string | Yes | ISO country code |
+| `currentPrice` | decimal | No | Current price |
+| `volume` | long | No | Trade volume |
+| `priceChange24h` | decimal | No | Absolute price change in last 24h |
 
 **Errors:**
 
@@ -332,7 +371,84 @@ Returns details for a single stock.
 
 #### `GET /api/v1/market/stocks/{stockId}/history`
 
-Returns the price history for a stock.
+Returns the price history for a stock. Behavior depends on the optional `range` query parameter:
+
+- **No `range`** — returns the raw price-history points as a **bare array**.
+- **With `range`** — returns aggregated **OHLC candles** wrapped in an object.
+
+**Path parameters:**
+
+| Param | Type | Required |
+|-------|------|----------|
+| `stockId` | guid | Yes |
+
+**Query parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `range` | string | No | One of `1h`, `24h`, `7d`, `30d`. Switches the response to OHLC candle mode. |
+
+Candle bucket widths per range: `1h` → 1-minute, `24h` → 30-minute, `7d` → 6-hour, `30d` → 1-day.
+
+**Response (no `range`):** `200 OK` — bare array
+
+```json
+[
+  {
+    "timestamp": "2026-05-07T00:00:00+00:00",
+    "price": 100.00
+  },
+  {
+    "timestamp": "2026-06-03T00:00:00+00:00",
+    "price": 175.25
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | datetime | Price change timestamp |
+| `price` | decimal | Stock price at that point |
+
+**Response (with `range`):** `200 OK`
+
+```json
+{
+  "range": "24h",
+  "candles": [
+    {
+      "bucketStart": "2026-06-06T00:00:00+00:00",
+      "open": 170.00,
+      "high": 178.00,
+      "low": 168.50,
+      "close": 175.25,
+      "volume": 12
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `range` | string | Echo of the normalized requested range |
+| `candles[].bucketStart` | datetime | Start of the candle's time bucket |
+| `candles[].open` | decimal | First price in the bucket |
+| `candles[].high` | decimal | Highest price in the bucket |
+| `candles[].low` | decimal | Lowest price in the bucket |
+| `candles[].close` | decimal | Last price in the bucket |
+| `candles[].volume` | long | Shares traded in the bucket |
+
+**Errors:**
+
+| Code | When |
+|------|------|
+| `VALIDATION_ERROR` | `range` is not one of the supported values |
+
+---
+
+#### `GET /api/v1/market/stocks/{stockId}/analytics`
+
+Returns trading analytics for a single stock.
 
 **Path parameters:**
 
@@ -343,28 +459,201 @@ Returns the price history for a stock.
 **Response:** `200 OK`
 
 ```json
-[
-  {
-    "timestamp": "2026-05-07T00:00:00+00:00",
-    "price": 100.00
-  },
-  {
-    "timestamp": "2026-05-17T00:00:00+00:00",
-    "price": 135.00
-  },
-  {
-    "timestamp": "2026-06-03T00:00:00+00:00",
-    "price": 175.25
-  }
-]
+{
+  "volume24hShares": 42,
+  "volume24hValue": 7350.00,
+  "volume7dShares": 310,
+  "volume7dValue": 54200.00,
+  "volatility7d": 0.1832,
+  "ownershipCount": 17,
+  "activeTraders24h": 9,
+  "marketCap": 8762.50
+}
 ```
-
-Note: this endpoint returns a **bare array**, not wrapped in `{ "items": [...] }`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `timestamp` | datetime | Price change timestamp |
-| `price` | decimal | Stock price at that point |
+| `volume24hShares` | long | Shares traded in last 24h |
+| `volume24hValue` | decimal | Value traded in last 24h |
+| `volume7dShares` | long | Shares traded in last 7 days |
+| `volume7dValue` | decimal | Value traded in last 7 days |
+| `volatility7d` | decimal | 7-day price volatility |
+| `ownershipCount` | int | Number of holders |
+| `activeTraders24h` | int | Distinct traders in last 24h |
+| `marketCap` | decimal | Current price × total shares outstanding |
+
+**Errors:**
+
+| Code | When |
+|------|------|
+| `NOT_FOUND` | Stock does not exist |
+
+---
+
+#### `GET /api/v1/market/events`
+
+Returns the market-wide activity feed (price-change events across all stocks).
+
+**Query parameters:**
+
+| Param | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `page` | int | No | 1 | Page number (>0) |
+| `pageSize` | int | No | 25 | Items per page (1–100) |
+| `type` | string | No | — | Optional filter by event `reason` (see PriceChangeReason enum) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "stockId": "f0000000-0000-0000-0000-000000000003",
+      "playerName": "mrekk",
+      "avatarUrl": "https://a.ppy.sh/7562902",
+      "countryCode": "AU",
+      "reason": "TopPlay",
+      "description": "mrekk set a new top play",
+      "percentChange": 3.25,
+      "newPrice": 175.25,
+      "occurredAt": "2026-06-07T02:15:00+00:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 25
+}
+```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `stockId` | guid | No | Stock ID |
+| `playerName` | string | No | osu! player name |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `countryCode` | string | Yes | ISO country code |
+| `reason` | string | No | Event reason (PriceChangeReason enum) |
+| `description` | string | No | Human-readable event description |
+| `percentChange` | decimal | No | Percentage price change for the event |
+| `newPrice` | decimal | No | Price after the event |
+| `occurredAt` | datetime | No | When the event happened |
+
+---
+
+#### `GET /api/v1/market/events/{stockId}`
+
+Returns the activity feed scoped to a single stock. Same item shape and envelope as `GET /market/events`, but without the `type` filter.
+
+**Path parameters:**
+
+| Param | Type | Required |
+|-------|------|----------|
+| `stockId` | guid | Yes |
+
+**Query parameters:**
+
+| Param | Type | Required | Default |
+|-------|------|----------|---------|
+| `page` | int | No | 1 |
+| `pageSize` | int | No | 25 |
+
+**Response:** `200 OK` — identical shape to `GET /market/events` (`{ items, page, pageSize }`).
+
+---
+
+#### `GET /api/v1/market/trending`
+
+Returns trending stocks bucketed into five sections.
+
+**Query parameters:**
+
+| Param | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `window` | string | No | `24h` | One of `1h`, `24h`, `7d` |
+| `limit` | int | No | 10 | Items per section (1–50) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "mostBought": [
+    {
+      "stockId": "f0000000-0000-0000-0000-000000000003",
+      "playerName": "mrekk",
+      "avatarUrl": "https://a.ppy.sh/7562902",
+      "countryCode": "AU",
+      "metricValue": 124,
+      "currentPrice": 175.25
+    }
+  ],
+  "mostSold": [],
+  "fastestRising": [],
+  "fastestFalling": [],
+  "highestVolume": []
+}
+```
+
+Each section is an array of:
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `stockId` | guid | No | Stock ID |
+| `playerName` | string | No | osu! player name |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `countryCode` | string | Yes | ISO country code |
+| `metricValue` | decimal | No | The ranking metric for that section (e.g. shares bought, % change, volume) |
+| `currentPrice` | decimal | No | Current stock price |
+
+**Errors:**
+
+| Code | When |
+|------|------|
+| `VALIDATION_ERROR` | `window` not one of `1h`/`24h`/`7d`, or `limit` outside 1–50 |
+
+---
+
+### Leaderboards
+
+All leaderboard endpoints require authentication and share the same query parameters, item shape, and envelope. Three variants are exposed: `/leaderboards/wealth`, `/leaderboards/profit`, and `/leaderboards/traders`.
+
+**Query parameters (all three):**
+
+| Param | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `period` | string | No | `daily` | One of `daily`, `weekly`, `monthly`. Omitting it defaults to `daily`; an explicitly supplied value outside the set is rejected with `VALIDATION_ERROR` |
+| `page` | int | No | 1 | Page number (>0) |
+| `pageSize` | int | No | 25 | Items per page (1–100) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "rank": 1,
+      "userId": "b0000000-0000-0000-0000-000000000001",
+      "username": "Cookiezi",
+      "avatarUrl": "https://a.ppy.sh/124493",
+      "countryCode": "KR",
+      "value": 18450.00,
+      "periodChange": 1250.00
+    }
+  ],
+  "period": "daily",
+  "page": 1,
+  "pageSize": 25
+}
+```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `rank` | int | No | 1-based rank within the page sequence |
+| `userId` | guid | No | Internal user ID |
+| `username` | string | No | osu! username |
+| `avatarUrl` | string | Yes | osu! profile image URL |
+| `countryCode` | string | Yes | ISO country code |
+| `value` | decimal | No | The leaderboard metric (total wealth / profit / trade count) |
+| `periodChange` | decimal | Yes | Change in the metric over the selected period (null when no baseline) |
+
+Top-level `period` echoes the normalized period used for the query.
 
 ---
 
@@ -484,7 +773,8 @@ Returns the authenticated user's trade history.
       "unitPrice": 160.00,
       "totalAmount": 800.00,
       "executedAt": "2026-05-17T00:00:00+00:00",
-      "playerName": "mrekk"
+      "playerName": "mrekk",
+      "avatarUrl": "https://a.ppy.sh/7562902"
     }
   ]
 }
@@ -500,6 +790,7 @@ Returns the authenticated user's trade history.
 | `totalAmount` | decimal | No | Total value |
 | `executedAt` | datetime | No | Execution timestamp |
 | `playerName` | string | Yes | osu! player name |
+| `avatarUrl` | string | Yes | osu! profile image URL |
 
 ---
 
@@ -528,7 +819,8 @@ Returns the user's portfolio summary with holdings, valuation, and profit/loss.
       "currentPrice": 175.25,
       "costBasis": 800.00,
       "currentValue": 876.25,
-      "profitLoss": 76.25
+      "profitLoss": 76.25,
+      "avatarUrl": "https://a.ppy.sh/7562902"
     }
   ]
 }
@@ -555,6 +847,7 @@ Per-holding fields:
 | `costBasis` | decimal | No | quantity × averagePrice |
 | `currentValue` | decimal | No | quantity × currentPrice |
 | `profitLoss` | decimal | No | currentValue − costBasis |
+| `avatarUrl` | string | Yes | osu! profile image URL |
 
 ---
 
@@ -573,7 +866,8 @@ Returns a flat list of current holdings (without valuation calculations).
       "playerName": "mrekk",
       "quantity": 5,
       "averagePrice": 160.00,
-      "currentPrice": 175.25
+      "currentPrice": 175.25,
+      "avatarUrl": "https://a.ppy.sh/7562902"
     }
   ]
 }
@@ -587,6 +881,7 @@ Returns a flat list of current holdings (without valuation calculations).
 | `quantity` | int | No | Shares held |
 | `averagePrice` | decimal | No | Average purchase price |
 | `currentPrice` | decimal | No | Current stock price |
+| `avatarUrl` | string | Yes | osu! profile image URL |
 
 ---
 
@@ -649,6 +944,96 @@ Returns the user's transaction ledger.
 | `amount` | decimal | No | Positive = credit, negative = debit |
 | `referenceId` | guid | Yes | Linked trade ID (for buy/sell) |
 | `createdAt` | datetime | No | Transaction timestamp |
+
+---
+
+### Notifications
+
+All notification endpoints require authentication and operate on the current user's own notifications.
+
+#### `GET /api/v1/notifications`
+
+Returns the user's notifications, newest first.
+
+**Query parameters:**
+
+| Param | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `unread` | bool | No | false | When `true`, returns only unread notifications |
+| `page` | int | No | 1 | Page number (>0) |
+| `pageSize` | int | No | 25 | Items per page (1–100) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "id": "90000000-0000-0000-0000-000000000001",
+      "type": "TopPlayDetected",
+      "title": "mrekk set a new top play",
+      "body": "mrekk set a new top play, which may move the price of your holding.",
+      "data": "{\"trackedPlayerId\":\"e0000000-0000-0000-0000-000000000001\"}",
+      "isRead": false,
+      "createdAt": "2026-06-07T02:15:00+00:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 25
+}
+```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `id` | guid | No | Notification ID |
+| `type` | string | No | Notification type (e.g. `"TopPlayDetected"`, `"PpIncreased"`) |
+| `title` | string | No | Short headline |
+| `body` | string | No | Notification body text |
+| `data` | string | Yes | JSON-encoded string with event-specific payload (parse client-side) |
+| `isRead` | bool | No | Whether the user has read it |
+| `createdAt` | datetime | No | When the notification was created |
+
+Notifications are fanned out to all holders of a stock when relevant market events occur (e.g. a tracked player's PP increase or new top play).
+
+---
+
+#### `POST /api/v1/notifications/{id}/read`
+
+Marks a single notification as read.
+
+**Path parameters:**
+
+| Param | Type | Required |
+|-------|------|----------|
+| `id` | guid | Yes |
+
+**Response:** `200 OK`
+
+```json
+{ "success": true }
+```
+
+**Errors:**
+
+| Code | When |
+|------|------|
+| `NOT_FOUND` | Notification does not exist or does not belong to the user |
+
+---
+
+#### `POST /api/v1/notifications/read-all`
+
+Marks all of the user's unread notifications as read.
+
+**Response:** `200 OK`
+
+```json
+{ "markedRead": 7 }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `markedRead` | int | Number of notifications marked read |
 
 ---
 
@@ -933,17 +1318,19 @@ Used in price history (not directly exposed via API, but visible in stock histor
 
 ### OAuth Login Flow
 
-1. Frontend navigates to `/api/v1/auth/login?returnUrl=https://yourapp.com/dashboard`.
+1. Frontend navigates to `/api/v1/auth/login?returnUrl=https://yourapp.com/auth/callback`.
 2. The API **redirects** (302) to osu!'s OAuth page — this must happen in the browser's main window, not via `fetch()`.
 3. After authorization, the user lands on `/api/v1/auth/callback?code=...&state=...`.
-4. The callback returns JSON with `accessToken` and optionally `returnUrl`.
-5. Frontend stores the token (e.g., localStorage or httpOnly cookie) and redirects to `returnUrl`.
+4. Because a `returnUrl` was supplied, the API **redirects** (302) the browser to `<returnUrl>#accessToken=...&expiresAt=...` — the token is in the URL **fragment**.
+5. The SPA callback page reads `window.location.hash`, extracts `accessToken`/`expiresAt`, stores the token (e.g. localStorage), clears the fragment, and routes the user onward.
+
+If `returnUrl` is omitted at step 1, the callback instead returns `200 OK` with a JSON body (`{ accessToken, expiresAt, returnUrl: null }`) — useful for non-browser clients, but the SPA should always pass a `returnUrl` so it gets the 302+fragment flow.
 
 **Important:** The `returnUrl` origin must be in the server's `Security:OAuthReturnUrl:AllowedOrigins` allow-list. In development, `localhost` origins are accepted automatically.
 
 ### Token Storage
 
-- Store the `accessToken` from the callback response.
+- Store the `accessToken` from the callback redirect fragment (or JSON body for the no-`returnUrl` branch).
 - Include it as `Authorization: Bearer <token>` on all authenticated requests.
 - Check `expiresAt` to handle token expiry (default: 120 minutes).
 - On 401 responses, redirect the user back to the login flow.

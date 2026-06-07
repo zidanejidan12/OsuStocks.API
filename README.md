@@ -2,7 +2,7 @@
 
 Backend service for the osu! Stocks game platform.
 
-This repository uses a modular monolith with Clean Architecture and vertical slices. Current implementation includes authentication, player registry, synchronization, trading, portfolio, market engine, and admin management.
+This repository uses a modular monolith with Clean Architecture and vertical slices. Current implementation includes authentication, player registry, synchronization, trading, portfolio, market engine, market intelligence (activity feed, OHLC candles, stock analytics, trending, leaderboards), notifications, and admin management.
 
 ## Current Status
 
@@ -11,8 +11,8 @@ Implemented modules:
 - Solution skeleton: `Api`, `Application`, `Domain`, `Infrastructure`, `Worker`, `Shared`
 - Persistence: EF Core + PostgreSQL mappings and migrations
 - Infrastructure wiring: Redis cache, Hangfire, MediatR, FluentValidation, Mapster, Swagger
-- Authentication: osu OAuth login/callback + JWT issuance + `/auth/me`
-- Player Registry: add/list/search/enable/disable tracked players
+- Authentication: osu OAuth login/callback + JWT issuance + `/auth/me` (returns `avatarUrl` + `countryCode`)
+- Player Registry: add/list/search/enable/disable tracked players (records `avatarUrl` + `countryCode`)
 - Synchronization: tracked-player snapshot sync + market event persistence (tiered: 1m/5m/15m)
 - Trading: buy/sell/history with maintenance mode guard
 - Portfolio: holdings and portfolio summary
@@ -21,13 +21,18 @@ Implemented modules:
   - Inputs: `BuyOrderExecuted`, `SellOrderExecuted`, `TopPlayDetected`, `PpIncreased`, `PlayerInactive`
   - Output: `PriceChanged`
   - Coefficient-based pricing + price floor + stock price history recording
+- Market Intelligence (Phase 2):
+  - Market activity event feed: global (`/market/events`) and per-stock (`/market/events/{stockId}`)
+  - OHLC candles via `GET /market/stocks/{id}/history?range=` (raw price points when `range` is omitted)
+  - Stock analytics (`/market/stocks/{id}/analytics`): volume/value 24h & 7d, 7d volatility, ownership count, active traders, market cap
+  - Trending (`/market/trending`): most bought/sold, fastest rising/falling, highest volume
+  - Leaderboards (`/leaderboards/{wealth,profit,traders}?period=`)
+- Notifications: holder fan-out on market events + list / unread filter / mark-read / mark-all-read
+- Avatars & country codes: surfaced on market, leaderboard, activity-feed, and `/auth/me` payloads
 - Admin: market settings management (multipliers + maintenance mode toggle)
+- Background jobs (Hangfire/Worker): tiered osu sync (1m/5m/15m), daily inactivity decay (03:00), daily wealth-snapshot capture (02:30)
 - Security: CORS, rate limiting, global exception handler, concurrency conflict handling (HTTP 409), anti-abuse (trade cooldown, position limits, rapid trading detection)
 - Deployment: Docker (API + Worker + PostgreSQL + Redis + nginx)
-
-Postponed (Phase 1.5):
-
-- Leaderboards (`/leaderboards/*`)
 
 ## Tech Stack
 
@@ -61,7 +66,9 @@ Postponed (Phase 1.5):
 |   |-- DATABASE.md
 |   |-- DEPLOYMENT.md
 |   |-- DOMAIN_MODEL.md
+|   |-- FRONTEND_API_CONTRACT.md
 |   |-- OPERATIONS.md
+|   |-- PHASE2_MARKET_INTELLIGENCE_PLAN.md
 |   |-- ROADMAP.md
 |   `-- USE_CASES.md
 |-- src/
@@ -183,27 +190,29 @@ dotnet run --project src/Worker/OsuStocks.Worker.csproj
 
 6. Open tools:
 
-- Swagger UI: `http://localhost:5065/swagger` (Development by default; set `Security__EnableSwagger=true` to enable outside Development)
-- Hangfire Dashboard: `http://localhost:5065/hangfire` (requires Admin role; non-development access also requires HTTPS)
+- Swagger UI: `http://localhost:5152/swagger` (Development by default; set `Security__EnableSwagger=true` to enable outside Development)
+- Hangfire Dashboard: `http://localhost:5152/hangfire` (requires Admin role; non-development access also requires HTTPS)
 - Health: `GET /api/v1/health`
 
 ## API Coverage (Current)
 
-Implemented route groups:
+Implemented route groups (all under `/api/v1`):
 
-- `/api/v1/auth` (rate limited: 10 req/min)
-- `/api/v1/market`
-- `/api/v1/market/stocks`
-- `/api/v1/trading` (rate limited: 30 req/min)
-- `/api/v1/portfolio`
-- `/api/v1/wallet`
-- `/api/v1/admin/tracked-players`
-- `/api/v1/admin/market-settings`
-- `/api/v1/health`
+- `/auth` — `/login`, `/callback`, `/me` (rate limited: 10 req/min)
+- `/market` — overview
+- `/market/stocks` — list, `/{id}` details, `/{id}/history?range=` (OHLC candles, or raw points without `range`), `/{id}/analytics`
+- `/market/events` — global activity feed, `/{stockId}` per-stock feed
+- `/market/trending` — most bought/sold, fastest rising/falling, highest volume
+- `/leaderboards` — `/wealth`, `/profit`, `/traders` (`?period=`)
+- `/trading` — `/buy`, `/sell`, `/history` (rate limited: 30 req/min)
+- `/portfolio` — summary, `/holdings`
+- `/wallet` — balance, `/transactions`
+- `/notifications` — list (`?unread=`), `/{id}/read`, `/read-all`
+- `/admin/tracked-players` — list/search/add/enable/disable (Admin role)
+- `/admin/market-settings` — get/update (Admin role)
+- `/health`
 
-Postponed from `docs/API_SPEC.md` (Phase 1.5):
-
-- `/api/v1/leaderboards/*`
+The Hangfire dashboard is served at `/hangfire` (Admin role; HTTPS outside Development).
 
 ## Testing
 
@@ -239,7 +248,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-This builds production artifacts for both API and Worker, and pushes Docker images to GitHub Container Registry at `ghcr.io/<owner>/PetProject/api` and `ghcr.io/<owner>/PetProject/worker`.
+This builds production artifacts for both API and Worker, and pushes Docker images to GitHub Container Registry. The image names derive from `github.repository` (owner/repo), so for this repo they are `ghcr.io/zidanejidan12/osustocks.api/api` and `ghcr.io/zidanejidan12/osustocks.api/worker` (each tagged with the version and `latest`).
 
 ## QA Acceptance Checklist
 

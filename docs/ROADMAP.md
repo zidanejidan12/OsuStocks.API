@@ -9,7 +9,7 @@ Build a fantasy stock market around osu! players using virtual currency and perf
 # Phase 0 - Foundation
 
 Status:
-Current
+Done
 
 Goals:
 
@@ -34,6 +34,9 @@ Project builds successfully.
 
 Priority:
 Critical
+
+Status:
+Done
 
 Modules:
 
@@ -75,12 +78,12 @@ Priority:
 High
 
 Status:
-Postponed
+Done
 
 Features:
 
-* Leaderboards (richest, investors, stocks)
-* Market maintenance mode
+* Leaderboards (wealth, profit, traders) — DONE (`/leaderboards/{wealth,profit,traders}?period=`)
+* Market maintenance mode — DONE (admin `IsMaintenanceMode` toggle via `/admin/market-settings`)
 
 Exit Criteria:
 
@@ -93,17 +96,24 @@ Deferred features are implemented and released after MVP stabilization.
 Priority:
 High
 
+Status:
+Done
+
 Features:
 
-* Price history
-* Market trends
-* Stock charts
-* Historical analytics
-* Market event feed
+* Price history — DONE (`/market/stocks/{id}/history`)
+* Market trends / trending — DONE (`/market/trending?window=&limit=`: most bought/sold, fastest rising/falling, highest volume)
+* Stock charts (OHLC candles) — DONE (`/market/stocks/{id}/history?range=` returns open/high/low/close/volume buckets)
+* Historical analytics — DONE (`/market/stocks/{id}/analytics`: 24h/7d volume, 7d volatility, ownership, active traders, market cap)
+* Market event feed — DONE (`/market/events`, `/market/events/{stockId}`)
+* Leaderboards (wealth, profit, traders) — DONE
+* Daily wealth-snapshot job — DONE (`wealth-snapshot` Hangfire job, daily 02:30 UTC, backs leaderboard period-over-period change)
+* Notifications — DONE (holder fan-out on PpIncreased/TopPlayDetected; `/notifications`, `/notifications/{id}/read`, `/notifications/read-all`)
+* Player + user avatars and country codes — DONE (avatarUrl / countryCode on market, leaderboard, feed, and /me payloads)
 
 Exit Criteria:
 
-Users understand why prices changed.
+Users understand why prices changed. — MET
 
 ---
 

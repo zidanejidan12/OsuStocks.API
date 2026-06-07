@@ -155,11 +155,15 @@ Framework:
 
 Responsibilities:
 
-* osu! Synchronization
+* osu! Synchronization (tiered: `osu-sync-tier1/2/3`)
 * Top Play Detection
 * Reward Distribution
 * Market Maintenance
+* Inactivity Decay (`inactivity-decay`, daily 03:00 UTC)
+* Daily Wealth Snapshot (`wealth-snapshot`, daily 02:30 UTC)
 * Daily Jobs
+
+Recurring jobs are registered in `OsuSynchronizationRecurringJobRegistrar`. Each job is idempotent, retryable (`[AutomaticRetry]`), and guarded against overlap (`[DisableConcurrentExecution]`); jobs dispatch a MediatR command and never embed business logic.
 
 ---
 
@@ -297,8 +301,9 @@ Responsibilities:
 * Price History
 * Market Events
 * Price Calculation
+* Market Intelligence (read side): overview, stock list/details, OHLC candles (`history?range=`), stock analytics (volume / volatility / ownership / market cap), market + per-stock activity feed, trending (most bought/sold, fastest rising/falling, highest volume)
 
-Only Market may modify stock prices.
+Only Market may modify stock prices. Market-intelligence endpoints are read-only projections and never mutate prices.
 
 ---
 
@@ -341,9 +346,23 @@ This module never updates stock prices directly.
 
 Responsibilities:
 
-* Richest Users
-* Best Investors
-* Best Stocks
+* Wealth ranking (wallet balance + market value of holdings)
+* Profit ranking (net worth = wealth − net deposits)
+* Trader ranking (traded credit volume in period)
+
+Period-over-period change is derived from daily `WealthSnapshot` rows captured by the `wealth-snapshot` Hangfire job. Leaderboard reads go through `ILeaderboardReadRepository` and are short-TTL cached via `IReadModelCache`.
+
+---
+
+## Notifications
+
+Responsibilities:
+
+* Persist in-app notifications (`Notification` entity / `notifications` table)
+* Holder fan-out: create a notification for every current holder of a stock when its player has a market-relevant event
+* List / unread filter / mark-read / mark-all-read
+
+Fan-out is implemented as additional in-process MediatR notification handlers reacting to `PpIncreased` and `TopPlayDetected` domain notifications. Real-time push delivery is out of scope (persist-and-poll).
 
 ---
 
@@ -353,9 +372,13 @@ Lightweight CQRS
 
 Single Database
 
-No Separate Read Models
-
 No Separate Read Database
+
+Read-heavy features (leaderboards, market intelligence) use dedicated read repositories that project straight to read models / DTOs (set-based EF queries, `AsNoTracking()`). These are projections over the same PostgreSQL database, not a separate read store.
+
+## Read-Model Caching
+
+Hot read projections are cached behind `IReadModelCache` (Redis-backed, `GetOrSetAsync` with a short TTL, e.g. ~30s for leaderboards). Redis remains cache-only; PostgreSQL is the source of truth, so a cache miss or flush always re-derives from the database.
 
 ---
 
@@ -412,6 +435,8 @@ Events remain in-process.
 Do not introduce Kafka.
 
 Do not introduce message brokers.
+
+Multiple handlers may react to one event. For example, `PpIncreased` and `TopPlayDetected` are consumed both by the Market Engine (price change) and by Notification fan-out handlers (notify current holders) — all dispatched in-process via MediatR notifications.
 
 ---
 
@@ -517,6 +542,14 @@ trades
 player_snapshots
 
 market_events
+
+user_wealth_snapshots
+
+notifications
+
+New columns: `tracked_players.avatar_url`, `tracked_players.country_code`, `users.country_code`.
+
+New indexes: `ix_trade_stock_executed`, `ix_stock_history_created`, `ix_wealth_snapshot_user_captured_desc`, `ix_notifications_user_created_desc`, `ix_notifications_user_unread`.
 
 ---
 

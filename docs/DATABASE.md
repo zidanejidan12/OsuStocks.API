@@ -30,10 +30,14 @@ Columns:
 
 * id (uuid)
 * osu_user_id (bigint)
-* username
-* avatar_url
-* role
+* username (varchar 64)
+* avatar_url (varchar 512, nullable)
+* country_code (varchar 2, nullable)
+* role (varchar 16, enum-as-string)
 * created_at
+* created_by
+* updated_at
+* updated_by
 * last_login_at
 
 Indexes:
@@ -79,8 +83,7 @@ Columns:
 
 Indexes:
 
-* ix_wallet_transactions_wallet_id
-* ix_wallet_transactions_created_at
+* ix_wallet_transactions_wallet_created_desc (wallet_id, created_at DESC)
 
 ---
 
@@ -94,14 +97,20 @@ Columns:
 
 * id
 * osu_user_id
-* username
-* tracking_tier
+* username (varchar 64)
+* avatar_url (varchar 512, nullable)
+* country_code (varchar 2, nullable)
+* tracking_tier (varchar 16, enum-as-string)
 * is_active
 * created_at
+* created_by
+* updated_at
+* updated_by
 
 Indexes:
 
 * uq_tracked_players_osu_user_id
+* ix_tracked_players_active_tier_username
 
 ---
 
@@ -144,8 +153,8 @@ Columns:
 
 Indexes:
 
-* ix_stock_history_stock
-* ix_stock_history_created
+* ix_stock_history_stock_created_desc (stock_id, created_at DESC)
+* ix_stock_history_created (created_at DESC)
 
 ---
 
@@ -207,9 +216,9 @@ Columns:
 
 Indexes:
 
-* ix_trade_user
 * ix_trade_stock
-* ix_trade_executed
+* ix_trade_user_executed_desc (user_id, executed_at DESC)
+* ix_trade_stock_executed (stock_id, executed_at DESC)
 
 ---
 
@@ -231,8 +240,7 @@ Columns:
 
 Indexes:
 
-* ix_snapshot_player
-* ix_snapshot_time
+* ix_snapshot_player_captured_desc (tracked_player_id, captured_at DESC)
 
 ---
 
@@ -252,8 +260,76 @@ Columns:
 
 Indexes:
 
-* ix_market_events_stock
-* ix_market_events_created
+* ix_market_events_stock_created_desc (stock_id, created_at DESC)
+
+---
+
+## market_settings
+
+Purpose:
+
+Singleton market tuning knobs.
+
+Columns:
+
+* id (uuid)
+* pp_multiplier (numeric 10,4)
+* trade_multiplier (numeric 10,4)
+* decay_multiplier (numeric 10,4)
+* is_maintenance_mode (bool, default false)
+* created_at
+* created_by
+* updated_at
+* updated_by
+
+Indexes:
+
+* (primary key only)
+
+---
+
+## user_wealth_snapshots
+
+Purpose:
+
+Daily per-user wealth/profit snapshots captured by the wealth-snapshot background job; backs wealth-history charts and profit leaderboards.
+
+Columns:
+
+* id (uuid)
+* user_id (uuid)
+* captured_at (timestamptz)
+* wealth (numeric 18,2)
+* net_deposits (numeric 18,2)
+* profit (numeric 18,2)
+
+Indexes:
+
+* ix_wealth_snapshot_user_captured_desc (user_id, captured_at DESC)
+
+---
+
+## notifications
+
+Purpose:
+
+Per-user notifications (e.g. holder fan-out on market events). Backs list / unread-count / mark-read endpoints.
+
+Columns:
+
+* id (uuid)
+* user_id (uuid)
+* type (varchar 64)
+* title (varchar 200)
+* body (varchar 1000)
+* data (jsonb, nullable)
+* is_read (bool)
+* created_at (timestamptz)
+
+Indexes:
+
+* ix_notifications_user_created_desc (user_id, created_at DESC)
+* ix_notifications_user_unread (user_id, is_read)
 
 ---
 
@@ -285,6 +361,25 @@ player_snapshots.tracked_player_id
 
 market_events.stock_id
 → player_stocks.id
+
+Note: `user_wealth_snapshots.user_id` and `notifications.user_id` reference users logically but have NO database-level foreign-key constraint (no FK is declared in their EF configuration or migration). They are indexed by user_id instead.
+
+---
+
+# Migration Chain
+
+Applied in order (Infrastructure/Persistence/Migrations):
+
+1. 20260604075733_InitialCreate
+2. 20260605092734_AddMarketSettings
+3. 20260605094836_EnforceWalletTransactionImmutability
+4. 20260605141353_AddOptimisticConcurrencyTokens
+5. 20260605165937_AddCompositeReadPathIndexes
+6. 20260606034441_AddMarketMaintenanceMode
+7. 20260607085732_AddReadModelIndexes — adds ix_trade_stock_executed, ix_stock_history_created
+8. 20260607092901_AddWealthSnapshots — adds user_wealth_snapshots (+ ix_wealth_snapshot_user_captured_desc)
+9. 20260607095754_AddPlayerUserAvatarCountry — adds users.country_code, tracked_players.avatar_url, tracked_players.country_code
+10. 20260607111642_AddNotifications — adds notifications (+ ix_notifications_user_created_desc, ix_notifications_user_unread)
 
 ---
 
