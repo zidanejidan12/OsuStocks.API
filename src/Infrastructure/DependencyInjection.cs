@@ -72,6 +72,8 @@ public static class DependencyInjection
         services.AddScoped<IWealthSnapshotRepository, WealthSnapshotRepository>();
         services.AddScoped<ILeaderboardReadRepository, LeaderboardReadRepository>();
         services.AddScoped<ITrendingReadRepository, TrendingReadRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationReadRepository, NotificationReadRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
