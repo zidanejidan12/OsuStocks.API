@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using OsuStocks.Api.IntegrationTests.Infrastructure;
@@ -23,7 +24,7 @@ public sealed class OAuthCallbackEndpointsTests
     public async Task Callback_CreatesUserWhenMissing_AndReturnsJwt()
     {
         await using var factory = new CustomWebApplicationFactory();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         using var scope = factory.Services.CreateScope();
         var userRepository = scope.ServiceProvider.GetRequiredService<InMemoryUserRepository>();
@@ -37,13 +38,23 @@ public sealed class OAuthCallbackEndpointsTests
         await tokenManager.StoreAuthorizationStateAsync(state, returnUrl, TimeSpan.FromMinutes(5));
 
         var response = await client.GetAsync($"/api/v1/auth/callback?code=valid-code&state={state}");
-        response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<CallbackResponse>();
+        // The callback completes a top-level browser navigation, so it 302-redirects to the SPA return
+        // URL with the token in the URL fragment (kept out of server logs) rather than returning JSON.
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
 
-        Assert.NotNull(payload);
-        Assert.False(string.IsNullOrWhiteSpace(payload.AccessToken));
-        Assert.Equal(returnUrl, payload.ReturnUrl);
+        var location = response.Headers.Location;
+        Assert.NotNull(location);
+        Assert.StartsWith(returnUrl, location!.ToString());
+
+        var fragment = location.Fragment.TrimStart('#').Split('&')
+            .Select(pair => pair.Split('=', 2))
+            .ToDictionary(parts => parts[0], parts => Uri.UnescapeDataString(parts[1]));
+
+        var accessToken = fragment.GetValueOrDefault("accessToken");
+
+        Assert.False(string.IsNullOrWhiteSpace(accessToken));
+        Assert.True(fragment.ContainsKey("expiresAt"));
 
         var user = await userRepository.GetByOsuUserIdAsync(1001);
 
@@ -67,7 +78,7 @@ public sealed class OAuthCallbackEndpointsTests
         Assert.NotNull(portfolio);
         Assert.Equal(1, portfolioRepository.Count);
 
-        var principal = ValidateJwt(payload.AccessToken);
+        var principal = ValidateJwt(accessToken!);
 
         Assert.Equal("1001", principal.FindFirst("osu_user_id")?.Value);
         Assert.Equal(user.Id.ToString(), principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);

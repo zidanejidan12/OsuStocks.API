@@ -6,13 +6,18 @@ namespace OsuStocks.Api.IntegrationTests.Infrastructure;
 
 internal sealed class QueryCountingCommandInterceptor : DbCommandInterceptor
 {
+    // Match bare snake_case table names rather than double-quoted tokens. The Npgsql
+    // provider does NOT quote identifiers that are already valid unquoted lowercase
+    // names (it emits `FROM holdings AS h`), so matching `"holdings"` would never hit
+    // against real PostgreSQL and the counter would stay at 0. A bare substring match
+    // also matches the quoted form, keeping this correct across providers.
     private static readonly string[] TargetTables =
     [
-        "\"holdings\"",
-        "\"portfolios\"",
-        "\"trades\"",
-        "\"player_stocks\"",
-        "\"tracked_players\""
+        "holdings",
+        "portfolios",
+        "trades",
+        "player_stocks",
+        "tracked_players"
     ];
 
     private int _selectCommandCount;
