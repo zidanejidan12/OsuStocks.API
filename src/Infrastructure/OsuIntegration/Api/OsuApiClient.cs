@@ -12,15 +12,26 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         string accessToken,
         CancellationToken cancellationToken = default)
     {
-        return GetUserInternalAsync("me", accessToken, cancellationToken);
+        return GetUserInternalAsync("me", accessToken, includeTopScore: true, cancellationToken);
     }
 
     public Task<OsuUserProfile> GetUserAsync(
         long osuUserId,
         string accessToken,
+        bool includeTopScore = true,
         CancellationToken cancellationToken = default)
     {
-        return GetUserInternalAsync($"users/{osuUserId}", accessToken, cancellationToken);
+        return GetUserInternalAsync($"users/{osuUserId}", accessToken, includeTopScore, cancellationToken);
+    }
+
+    public async Task<OsuTopScore?> GetTopScoreAsync(
+        long osuUserId,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        var topScore = await GetTopScoreInternalAsync(osuUserId, accessToken, cancellationToken);
+
+        return topScore is null ? null : new OsuTopScore(topScore.Id, topScore.Pp);
     }
 
     public async Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
@@ -54,12 +65,15 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
     private async Task<OsuUserProfile> GetUserInternalAsync(
         string path,
         string accessToken,
+        bool includeTopScore,
         CancellationToken cancellationToken)
     {
         var user = await SendAsync<OsuUserResponse>(path, accessToken, cancellationToken)
             ?? throw new InvalidOperationException($"osu! API returned empty user response for '{path}'.");
 
-        var topScore = await GetTopScoreAsync(user.Id, accessToken, cancellationToken);
+        var topScore = includeTopScore
+            ? await GetTopScoreInternalAsync(user.Id, accessToken, cancellationToken)
+            : null;
 
         return new OsuUserProfile(
             user.Id,
@@ -71,7 +85,7 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
             topScore?.Pp);
     }
 
-    private async Task<OsuTopScoreResponse?> GetTopScoreAsync(
+    private async Task<OsuTopScoreResponse?> GetTopScoreInternalAsync(
         long osuUserId,
         string accessToken,
         CancellationToken cancellationToken)
