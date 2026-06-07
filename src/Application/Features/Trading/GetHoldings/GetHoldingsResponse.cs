@@ -8,4 +8,5 @@ public sealed record HoldingItemResponse(
     string? PlayerName,
     int Quantity,
     decimal AveragePrice,
-    decimal CurrentPrice);
+    decimal CurrentPrice,
+    string? AvatarUrl = null);
