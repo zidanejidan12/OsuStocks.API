@@ -20,6 +20,8 @@ public sealed class GetMarketStockDetailsQueryHandler(IMarketReadRepository mark
         return Result.Success(new GetMarketStockDetailsResponse(
             stock.StockId,
             stock.PlayerName,
+            stock.AvatarUrl,
+            stock.CountryCode,
             stock.CurrentPrice,
             stock.Volume,
             stock.PriceChange24h));

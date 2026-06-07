@@ -24,6 +24,9 @@ internal sealed class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.HasIndex(x => new { x.UserId, x.ExecutedAt })
             .IsDescending(false, true)
             .HasDatabaseName("ix_trade_user_executed_desc");
+        builder.HasIndex(x => new { x.StockId, x.ExecutedAt })
+            .IsDescending(false, true)
+            .HasDatabaseName("ix_trade_stock_executed");
 
         builder.HasOne(x => x.User)
             .WithMany(x => x.Trades)

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OsuStocks.Domain.Models.Market;
 using OsuStocks.Domain.Repositories;
 
@@ -90,6 +91,8 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
         return new MarketStockDetailsReadModel(
             row.StockId,
             row.PlayerName,
+            row.AvatarUrl,
+            row.CountryCode,
             row.CurrentPrice,
             row.Volume,
             ComputeChange24h(row));
@@ -107,6 +110,175 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<StockCandleReadModel>> GetStockCandlesAsync(
+        Guid stockId,
+        HistoryRangeSpec spec,
+        CancellationToken cancellationToken = default)
+    {
+        // Fixed-width time buckets aligned to the Unix epoch (UTC): each row's timestamp is floored
+        // to a multiple of the bucket width since 1970. EXTRACT(EPOCH FROM timestamptz) is absolute
+        // (timezone-independent), so bucket_start is stable regardless of the session TimeZone and
+        // groups correctly for every width (1 minute .. 1 day). Open/Close are the first/last
+        // new_price by created_at; high/low are max/min; volume is SUM(trade.quantity) per bucket.
+        // @bucket is a fixed server-side interval literal (HistoryRangeSpec); stock_id/from are bound.
+        const string sql = @"
+WITH price_rows AS (
+    SELECT
+        h.new_price,
+        h.created_at,
+        to_timestamp(
+            floor(EXTRACT(EPOCH FROM h.created_at) / EXTRACT(EPOCH FROM @bucket::interval))
+            * EXTRACT(EPOCH FROM @bucket::interval)) AS bucket_start
+    FROM stock_price_history h
+    WHERE h.stock_id = @stock_id
+      AND h.created_at >= @from
+),
+ohlc AS (
+    SELECT
+        bucket_start,
+        (array_agg(new_price ORDER BY created_at ASC))[1]  AS open,
+        (array_agg(new_price ORDER BY created_at DESC))[1] AS close,
+        MAX(new_price) AS high,
+        MIN(new_price) AS low
+    FROM price_rows
+    GROUP BY bucket_start
+),
+volumes AS (
+    SELECT
+        to_timestamp(
+            floor(EXTRACT(EPOCH FROM t.executed_at) / EXTRACT(EPOCH FROM @bucket::interval))
+            * EXTRACT(EPOCH FROM @bucket::interval)) AS bucket_start,
+        SUM(t.quantity) AS volume
+    FROM trades t
+    WHERE t.stock_id = @stock_id
+      AND t.executed_at >= @from
+    GROUP BY 1
+)
+SELECT
+    o.bucket_start                                AS ""BucketStart"",
+    o.open                                        AS ""Open"",
+    o.high                                        AS ""High"",
+    o.low                                         AS ""Low"",
+    o.close                                       AS ""Close"",
+    COALESCE(v.volume, 0)::bigint                 AS ""Volume""
+FROM ohlc o
+LEFT JOIN volumes v ON v.bucket_start = o.bucket_start
+ORDER BY o.bucket_start ASC;";
+
+        var rows = await dbContext.Database
+            .SqlQueryRaw<CandleRow>(
+                sql,
+                new NpgsqlParameter("stock_id", stockId),
+                new NpgsqlParameter("from", spec.From.UtcDateTime),
+                new NpgsqlParameter("bucket", spec.BucketInterval))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new StockCandleReadModel(
+                new DateTimeOffset(DateTime.SpecifyKind(x.BucketStart, DateTimeKind.Utc)),
+                x.Open,
+                x.High,
+                x.Low,
+                x.Close,
+                x.Volume))
+            .ToList();
+    }
+
+    public async Task<StockAnalyticsReadModel?> GetStockAnalyticsAsync(
+        Guid stockId,
+        CancellationToken cancellationToken = default)
+    {
+        var stock = await dbContext.PlayerStocks
+            .AsNoTracking()
+            .Where(x => x.Id == stockId)
+            .Select(x => new { x.CurrentPrice })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (stock is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var cutoff24h = now.AddHours(-24);
+        var cutoff7d = now.AddDays(-7);
+
+        // Uses ix_trade_stock_executed (stock_id, executed_at). Direct per-aggregate queries (no
+        // GroupBy) so each translates to a simple SQL aggregate, and the distinct trader count is a
+        // top-level COUNT(DISTINCT user_id) which EF translates cleanly.
+        var trades24h = dbContext.Trades
+            .AsNoTracking()
+            .Where(x => x.StockId == stockId && x.ExecutedAt >= cutoff24h);
+        var volume24hShares = await trades24h.Select(x => (long?)x.Quantity).SumAsync(cancellationToken) ?? 0L;
+        var volume24hValue = await trades24h.Select(x => (decimal?)x.TotalAmount).SumAsync(cancellationToken) ?? 0m;
+        var activeTraders24h = await trades24h.Select(x => x.UserId).Distinct().CountAsync(cancellationToken);
+
+        var trades7d = dbContext.Trades
+            .AsNoTracking()
+            .Where(x => x.StockId == stockId && x.ExecutedAt >= cutoff7d);
+        var volume7dShares = await trades7d.Select(x => (long?)x.Quantity).SumAsync(cancellationToken) ?? 0L;
+        var volume7dValue = await trades7d.Select(x => (decimal?)x.TotalAmount).SumAsync(cancellationToken) ?? 0m;
+
+        var ownershipCount = await dbContext.Holdings
+            .AsNoTracking()
+            .Where(x => x.StockId == stockId && x.Quantity > 0)
+            .Select(x => x.PortfolioId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        var totalHeldShares = await dbContext.Holdings
+            .AsNoTracking()
+            .Where(x => x.StockId == stockId && x.Quantity > 0)
+            .Select(x => (long?)x.Quantity)
+            .SumAsync(cancellationToken) ?? 0L;
+
+        var volatility = await GetVolatility7dAsync(stockId, cutoff7d, cancellationToken);
+
+        return new StockAnalyticsReadModel(
+            volume24hShares,
+            volume24hValue,
+            volume7dShares,
+            volume7dValue,
+            volatility,
+            ownershipCount,
+            activeTraders24h,
+            totalHeldShares * stock.CurrentPrice);
+    }
+
+    // Sample standard deviation of per-step simple returns over the 7d window. EF cannot translate
+    // the window function needed to do this in SQL, and a stock's 7d price-history is small, so the
+    // returns are computed in memory. Returns 0 when there are fewer than two usable returns.
+    private async Task<decimal> GetVolatility7dAsync(
+        Guid stockId,
+        DateTimeOffset cutoff7d,
+        CancellationToken cancellationToken)
+    {
+        var prices = await dbContext.StockPriceHistory
+            .AsNoTracking()
+            .Where(x => x.StockId == stockId && x.CreatedAt >= cutoff7d)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => x.NewPrice)
+            .ToListAsync(cancellationToken);
+
+        var returns = new List<decimal>();
+        for (var i = 1; i < prices.Count; i++)
+        {
+            if (prices[i - 1] != 0m)
+            {
+                returns.Add((prices[i] - prices[i - 1]) / prices[i - 1]);
+            }
+        }
+
+        if (returns.Count < 2)
+        {
+            return 0m;
+        }
+
+        var mean = returns.Average();
+        var variance = returns.Sum(r => (r - mean) * (r - mean)) / (returns.Count - 1);
+        return (decimal)Math.Sqrt((double)variance);
+    }
+
     // Projects only SQL-translatable pieces: the player join, the trade-volume aggregate,
     // and the baseline/fallback reference prices via correlated subqueries. No arithmetic
     // or cross-subquery coalesce here, so EF can translate the whole query.
@@ -120,6 +292,8 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             {
                 StockId = stock.Id,
                 PlayerName = player.Username,
+                AvatarUrl = player.AvatarUrl,
+                CountryCode = player.CountryCode,
                 CurrentPrice = stock.CurrentPrice,
                 Volume = dbContext.Trades
                     .Where(x => x.StockId == stock.Id)
@@ -143,6 +317,8 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
         return new MarketStockListItemReadModel(
             row.StockId,
             row.PlayerName,
+            row.AvatarUrl,
+            row.CountryCode,
             row.CurrentPrice,
             row.Volume,
             ComputeChange24h(row));
@@ -179,9 +355,23 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
     {
         public Guid StockId { get; init; }
         public string PlayerName { get; init; } = string.Empty;
+        public string? AvatarUrl { get; init; }
+        public string? CountryCode { get; init; }
         public decimal CurrentPrice { get; init; }
         public long Volume { get; init; }
         public decimal? BaselinePrice { get; init; }
         public decimal? FallbackPrice { get; init; }
+    }
+
+    // Unmapped projection target for the raw OHLC SqlQueryRaw call; property names match the
+    // double-quoted SELECT aliases so EF hydrates by column name.
+    private sealed class CandleRow
+    {
+        public DateTime BucketStart { get; init; }
+        public decimal Open { get; init; }
+        public decimal High { get; init; }
+        public decimal Low { get; init; }
+        public decimal Close { get; init; }
+        public long Volume { get; init; }
     }
 }

@@ -21,5 +21,8 @@ internal sealed class StockPriceHistoryConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(x => new { x.StockId, x.CreatedAt })
             .IsDescending(false, true)
             .HasDatabaseName("ix_stock_history_stock_created_desc");
+        builder.HasIndex(x => x.CreatedAt)
+            .IsDescending(true)
+            .HasDatabaseName("ix_stock_history_created");
     }
 }

@@ -14,6 +14,8 @@ internal sealed class TrackedPlayerConfiguration : IEntityTypeConfiguration<Trac
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.OsuUserId).HasColumnName("osu_user_id").IsRequired();
         builder.Property(x => x.Username).HasColumnName("username").HasMaxLength(64).IsRequired();
+        builder.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(512);
+        builder.Property(x => x.CountryCode).HasColumnName("country_code").HasMaxLength(2);
         builder.Property(x => x.TrackingTier).HasColumnName("tracking_tier").HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(x => x.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
