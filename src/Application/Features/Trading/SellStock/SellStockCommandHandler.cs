@@ -67,6 +67,7 @@ public sealed class SellStockCommandHandler(
             return Result.Failure<SellStockResponse>("INSUFFICIENT_HOLDINGS", "Holding quantity is insufficient.");
         }
 
+        var executedAt = DateTimeOffset.UtcNow;
         var unitPrice = stock.CurrentPrice;
         var totalAmount = unitPrice * request.Quantity;
 
@@ -97,7 +98,7 @@ public sealed class SellStockCommandHandler(
             Quantity = request.Quantity,
             UnitPrice = unitPrice,
             TotalAmount = totalAmount,
-            ExecutedAt = DateTimeOffset.UtcNow
+            ExecutedAt = executedAt
         };
         await tradeRepository.AddAsync(trade, cancellationToken);
 
@@ -108,14 +109,14 @@ public sealed class SellStockCommandHandler(
             TransactionType = WalletTransactionType.SellStock,
             Amount = totalAmount,
             ReferenceId = trade.Id,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = executedAt
         };
         await walletTransactionRepository.AddAsync(walletTransaction, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await publisher.Publish(new SellOrderExecutedNotification(
-            new SellOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, DateTimeOffset.UtcNow)), cancellationToken);
+            new SellOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, executedAt)), cancellationToken);
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 

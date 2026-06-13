@@ -9,7 +9,9 @@ using OsuStocks.Api.Common;
 using OsuStocks.Api.Middleware;
 using OsuStocks.Api.Security;
 using OsuStocks.Application;
+using OsuStocks.Application.Features.Achievements.GetAchievements;
 using OsuStocks.Application.Features.Investor.GetInvestorLevel;
+using OsuStocks.Application.Features.Missions.GetMissions;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetOsuLoginUrl;
 using OsuStocks.Application.Features.OsuIntegration.Auth.HandleOsuCallback;
@@ -926,6 +928,60 @@ investorGroup.MapGet("/level", async (
         xpIntoLevel = result.Value.XpIntoLevel,
         xpForNextLevel = result.Value.XpForNextLevel,
         progressToNext = result.Value.ProgressToNext
+    });
+});
+
+var achievementsGroup = app.MapGroup("/api/v1/achievements")
+    .RequireAuthorization();
+
+achievementsGroup.MapGet("", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetAchievementsQuery(userId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        unlockedCount = result.Value.UnlockedCount,
+        totalCount = result.Value.TotalCount,
+        items = result.Value.Items
+    });
+});
+
+var missionsGroup = app.MapGroup("/api/v1/missions")
+    .RequireAuthorization();
+
+missionsGroup.MapGet("", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetMissionsQuery(userId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        items = result.Value.Items
     });
 });
 

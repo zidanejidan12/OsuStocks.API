@@ -710,6 +710,83 @@ Response:
 
 ---
 
+# Achievements
+
+One-time milestone unlocks from a static catalog. Progress is derived from trade history and
+investor level; unlocking grants credits (`AchievementReward` ledger entry) and a named badge
+(the achievement's `name`).
+Requires authentication; always operates on the current user.
+
+## GET /achievements
+
+Purpose:
+
+List every achievement with the caller's progress and unlock status.
+
+Response:
+
+{
+"unlockedCount": 2,
+"totalCount": 9,
+"items": [
+{
+"code": "first-trade",
+"name": "First Steps",
+"description": "Execute your first trade.",
+"category": "Trading",
+"metric": "TotalTrades",
+"threshold": 1,
+"currentValue": 1,
+"rewardCredits": 1000,
+"unlocked": true,
+"unlockedAt": "2026-06-14T10:00:00Z"
+}
+]
+}
+
+`currentValue` is capped at `threshold`. Level-based achievements unlock on the next trade after
+the level is reached.
+
+---
+
+# Missions
+
+Recurring daily + weekly tasks from a static catalog. Progress is derived from the user's trades
+within the current period window (no reset job; periods roll with the UTC clock). Completing a
+mission grants credits (`MissionReward` ledger entry). Requires authentication.
+
+## GET /missions
+
+Purpose:
+
+List the caller's current daily and weekly missions with progress and completion status.
+
+Response:
+
+{
+"items": [
+{
+"code": "daily-trade-3",
+"name": "Daily Grind",
+"description": "Execute 3 trades today.",
+"period": "Daily",
+"periodKey": "2026-06-14",
+"metric": "TradesInPeriod",
+"target": 3,
+"currentValue": 2,
+"rewardCredits": 3000,
+"completed": false,
+"completedAt": null,
+"resetsAt": "2026-06-15T00:00:00Z"
+}
+]
+}
+
+`currentValue` is capped at `target`. `periodKey` is the UTC day (`yyyy-MM-dd`) for daily and the
+ISO week (`yyyy-Www`) for weekly; `resetsAt` is the exclusive end of the current period.
+
+---
+
 # Admin
 
 Authentication Required:

@@ -76,6 +76,9 @@ public static class DependencyInjection
         services.AddScoped<INotificationReadRepository, NotificationReadRepository>();
         services.AddScoped<IInvestorProfileRepository, InvestorProfileRepository>();
         services.AddScoped<IInvestorProfileReadRepository, InvestorProfileReadRepository>();
+        services.AddScoped<IUserAchievementRepository, UserAchievementRepository>();
+        services.AddScoped<IUserMissionCompletionRepository, UserMissionCompletionRepository>();
+        services.AddScoped<IProgressionMetricsReadRepository, ProgressionMetricsReadRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
@@ -84,6 +87,12 @@ public static class DependencyInjection
         services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
         services.AddSingleton<OsuStocks.Domain.Investor.Interfaces.IInvestorLevelCalculator,
             OsuStocks.Domain.Investor.Services.InvestorLevelCalculator>();
+        services.AddSingleton<OsuStocks.Domain.Achievements.Interfaces.IAchievementCatalog,
+            OsuStocks.Domain.Achievements.Services.AchievementCatalog>();
+        services.AddSingleton<OsuStocks.Domain.Missions.Interfaces.IMissionCatalog,
+            OsuStocks.Domain.Missions.Services.MissionCatalog>();
+        services.AddSingleton<OsuStocks.Domain.Missions.Interfaces.IMissionPeriodCalculator,
+            OsuStocks.Domain.Missions.Services.MissionPeriodCalculator>();
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
         services.AddScoped<IAppTokenService, JwtAppTokenService>();
