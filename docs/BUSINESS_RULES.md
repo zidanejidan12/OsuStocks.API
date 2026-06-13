@@ -248,7 +248,7 @@ Profit (net worth) = Wealth − NetDeposits.
 
 NetDeposits = SUM(deposit-type transaction amounts) − SUM(AdminDeduction amounts), where:
 
-* Deposit types = `InitialGrant` + `AdminGrant` + `DailyReward`
+* Deposit types = `InitialGrant` + `AdminGrant` + `DailyReward` + `MissionReward` + `AchievementReward`
 * Deductions = `AdminDeduction`
 
 All wallet-transaction amounts are stored positive; the deduction sum is subtracted.
@@ -333,6 +333,47 @@ rule. Title bands: 1–9 Novice Investor, 10–24 Retail Trader, 25–49 Active 
 
 When an XP award advances a user's level, an in-app notification of type `InvestorLevelUp` is
 created (data payload `{"level","title"}`), reusing the existing notification infrastructure.
+
+---
+
+# Achievement & Mission Rules
+
+## BR-049d Achievements
+
+Achievements are one-time milestone unlocks from a static, code-defined catalog (Phase 3).
+
+* Progress is **derived on demand** from existing data (lifetime trade count, traded volume,
+  distinct stocks bought, current investor level). No progress counters are stored — only unlock
+  rows in `user_achievements` (unique per `(user, code)`).
+* Evaluated **post-commit** by a MediatR handler on `BuyOrderExecuted` / `SellOrderExecuted`
+  (best-effort; never fails the trade). A newly satisfied achievement is unlocked idempotently,
+  grants its catalog credit reward via an `AchievementReward` wallet transaction, and produces an
+  `AchievementUnlocked` notification.
+* Level-based achievements are eventually consistent — they unlock on the next trade after the
+  level is reached (handler ordering within one event dispatch is not guaranteed).
+* Read via `GET /achievements` (all achievements with derived progress + unlock status).
+
+## BR-049e Missions
+
+Missions are recurring daily/weekly tasks from a static catalog (Phase 3).
+
+* Cadence: **daily** (resets 00:00 UTC) and **weekly** (ISO week, resets Monday 00:00 UTC).
+  There is **no reset job and no pre-assignment** — a mission's period is identified by a
+  `PeriodKey` (daily `yyyy-MM-dd`, weekly ISO `yyyy-'W'ww`) computed from the UTC clock, and
+  in-period progress is **derived** from the user's trades within the half-open period window.
+* Only completions are stored, in `user_mission_completions` (unique per `(user, code, period)`),
+  which makes reward grants idempotent.
+* Evaluated **post-commit** on `BuyOrderExecuted` / `SellOrderExecuted` (best-effort), keyed off
+  the trade's instant so the triggering trade counts in its own period. A newly satisfied mission
+  is completed idempotently, grants its catalog credit reward via a `MissionReward` wallet
+  transaction, and produces a `MissionCompleted` notification.
+* Read via `GET /missions` (current daily + weekly missions with derived progress + completion).
+
+## BR-049f Reward Credits Are Neutral on the Profit Leaderboard
+
+`MissionReward` and `AchievementReward` wallet transactions are treated as **deposits** (like
+`DailyReward`) in the profit calculation (BR-046), so earned reward credits do not count as
+trading profit on the profit leaderboard.
 
 ---
 

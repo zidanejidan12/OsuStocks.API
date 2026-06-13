@@ -90,7 +90,9 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                     .Where(t => t.Wallet.UserId == user.Id
                         && (t.TransactionType == WalletTransactionType.InitialGrant
                             || t.TransactionType == WalletTransactionType.AdminGrant
-                            || t.TransactionType == WalletTransactionType.DailyReward))
+                            || t.TransactionType == WalletTransactionType.DailyReward
+                            || t.TransactionType == WalletTransactionType.MissionReward
+                            || t.TransactionType == WalletTransactionType.AchievementReward))
                     .Select(t => (decimal?)t.Amount)
                     .Sum() ?? 0m,
                 Deductions = dbContext.WalletTransactions
