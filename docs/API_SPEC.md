@@ -94,8 +94,19 @@ Response:
 "username": "player",
 "avatarUrl": "https://a.ppy.sh/123456",
 "countryCode": "ID",
-"role": "User"
+"role": "User",
+"investorLevel": {
+"level": 7,
+"title": "Novice Investor",
+"totalXp": 4820000,
+"xpIntoLevel": 120000,
+"xpForNextLevel": 360000,
+"progressToNext": 0.333
 }
+}
+
+`investorLevel` mirrors `GET /investor/level` (see Investor Levels). It is always present;
+a user who has never traded reports level 1 with 0 XP.
 
 ---
 
@@ -661,6 +672,41 @@ Response:
 {
 "markedRead": 7
 }
+
+A level-up produces a notification with `type` `InvestorLevelUp` and a `data` payload of
+`{"level":<int>,"title":"<string>"}` (see Investor Levels).
+
+---
+
+# Investor Levels
+
+Investors earn XP from trading volume (1 XP per credit of gross traded value, on both buys and
+sells). Levels follow an osu!-style curve: each level requires strictly more XP than the last,
+with a soft cap at level 100 (every level beyond 100 costs a flat 100,000,000,000 XP, so
+100 → 101 is a very large jump). Levels are cosmetic — they grant titles only, no gameplay perks.
+
+The `/investor` group requires authentication and always operates on the current user.
+
+## GET /investor/level
+
+Purpose:
+
+Return the current user's investor level standing. A user who has never traded reports
+level 1 with 0 XP (never 404s).
+
+Response:
+
+{
+"level": 7,
+"title": "Novice Investor",
+"totalXp": 4820000,
+"xpIntoLevel": 120000,
+"xpForNextLevel": 360000,
+"progressToNext": 0.333
+}
+
+`progressToNext` is a 0..1 fraction. Title bands: 1–9 Novice Investor, 10–24 Retail Trader,
+25–49 Active Trader, 50–74 Seasoned Investor, 75–99 Blue-Chip Trader, 100+ Market Legend.
 
 ---
 

@@ -74,12 +74,16 @@ public static class DependencyInjection
         services.AddScoped<ITrendingReadRepository, TrendingReadRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationReadRepository, NotificationReadRepository>();
+        services.AddScoped<IInvestorProfileRepository, InvestorProfileRepository>();
+        services.AddScoped<IInvestorProfileReadRepository, InvestorProfileReadRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
         services.AddSingleton<IAntiAbuseSettings, AntiAbuseSettings>();
         services.AddScoped<ITradingGuardService, TradingGuardService>();
         services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
+        services.AddSingleton<OsuStocks.Domain.Investor.Interfaces.IInvestorLevelCalculator,
+            OsuStocks.Domain.Investor.Services.InvestorLevelCalculator>();
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
         services.AddScoped<IAppTokenService, JwtAppTokenService>();
