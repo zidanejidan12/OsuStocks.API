@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MarketSettings> MarketSettings => Set<MarketSettings>();
     public DbSet<WealthSnapshot> WealthSnapshots => Set<WealthSnapshot>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<InvestorProfile> InvestorProfiles => Set<InvestorProfile>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

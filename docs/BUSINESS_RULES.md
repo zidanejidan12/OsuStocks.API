@@ -298,6 +298,44 @@ Out of scope:
 
 ---
 
+# Investor Level Rules
+
+## BR-049a Investor XP from Trading
+
+Each user has an `InvestorProfile` tracking lifetime XP and a derived level (Phase 3).
+
+* XP is earned from trading volume: `floor(UnitPrice × Quantity)` — i.e. 1 XP per whole credit of
+  gross traded value — on **both** buy and sell executions.
+* XP is awarded best-effort **after** the trade commits, by a MediatR handler on the
+  `BuyOrderExecuted` / `SellOrderExecuted` events (the same post-commit pattern as holder fan-out
+  notifications). It is never deducted; `TotalXp` only increases.
+* The profile is created lazily on the user's first XP-earning trade. Users who have never traded
+  are treated as level 1 with 0 XP.
+
+## BR-049b Level Curve (osu!-style, soft-capped at 100)
+
+The cumulative XP required to reach level `L` follows the osu! score-to-level formula:
+
+* For `1 ≤ L ≤ 100`: `5000/3 × (4L³ − 3L² − L) + 1.25 × 1.8^(L−60)` (level 1 floor = 0).
+* For `L ≥ 100`: `floor(100) + 100,000,000,000 × (L − 100)`.
+
+Consequences:
+
+* Every level requires strictly more XP than the previous one.
+* Level 100 is a soft cap: each level beyond it costs a flat 100 billion XP, so `100 → 101` is a
+  very large jump relative to earlier levels.
+
+Levels are **cosmetic**: they grant titles only and do not alter any trading, wallet, or market
+rule. Title bands: 1–9 Novice Investor, 10–24 Retail Trader, 25–49 Active Trader,
+50–74 Seasoned Investor, 75–99 Blue-Chip Trader, 100+ Market Legend.
+
+## BR-049c Level-Up Notification
+
+When an XP award advances a user's level, an in-app notification of type `InvestorLevelUp` is
+created (data payload `{"level","title"}`), reusing the existing notification infrastructure.
+
+---
+
 # Synchronization Rules
 
 ## BR-050 Polling Strategy
