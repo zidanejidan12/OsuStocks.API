@@ -150,7 +150,7 @@ public sealed class BuyStockCommandHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await publisher.Publish(new BuyOrderExecutedNotification(
-            new BuyOrderExecuted(stock.Id, request.Quantity, unitPrice, DateTimeOffset.UtcNow)), cancellationToken);
+            new BuyOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, DateTimeOffset.UtcNow)), cancellationToken);
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 

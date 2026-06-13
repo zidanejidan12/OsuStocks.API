@@ -1,3 +1,5 @@
+using OsuStocks.Application.Features.Investor.GetInvestorLevel;
+
 namespace OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
 
 public sealed record CurrentUserProfileResponse(
@@ -6,4 +8,5 @@ public sealed record CurrentUserProfileResponse(
     string Username,
     string? AvatarUrl,
     string? CountryCode,
-    string Role);
+    string Role,
+    GetInvestorLevelResponse InvestorLevel);

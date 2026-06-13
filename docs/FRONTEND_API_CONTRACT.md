@@ -212,7 +212,15 @@ Returns the authenticated user's profile.
   "username": "Cookiezi",
   "avatarUrl": "https://a.ppy.sh/124493",
   "countryCode": "KR",
-  "role": "Admin"
+  "role": "Admin",
+  "investorLevel": {
+    "level": 7,
+    "title": "Novice Investor",
+    "totalXp": 4820000,
+    "xpIntoLevel": 120000,
+    "xpForNextLevel": 360000,
+    "progressToNext": 0.333
+  }
 }
 ```
 
@@ -224,6 +232,46 @@ Returns the authenticated user's profile.
 | `avatarUrl` | string | Yes | osu! profile image URL |
 | `countryCode` | string | Yes | ISO country code (e.g. `"KR"`) |
 | `role` | string | No | `"User"` or `"Admin"` |
+| `investorLevel` | object | No | Investor level standing (same shape as `GET /investor/level`) |
+
+---
+
+### Investor Levels
+
+#### `GET /api/v1/investor/level`
+
+Returns the authenticated user's investor level standing. Never 404s — a user who has never
+traded reports level 1 with 0 XP.
+
+| | |
+|---|---|
+| Auth | Bearer token |
+| Rate limited | Yes (auth) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "level": 7,
+  "title": "Novice Investor",
+  "totalXp": 4820000,
+  "xpIntoLevel": 120000,
+  "xpForNextLevel": 360000,
+  "progressToNext": 0.333
+}
+```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `level` | int | No | Current level (≥ 1; may exceed 100 in the soft-capped region) |
+| `title` | string | No | Cosmetic title for the level band |
+| `totalXp` | long | No | Lifetime XP earned (1 per credit of trade volume) |
+| `xpIntoLevel` | long | No | XP earned since reaching the current level |
+| `xpForNextLevel` | long | No | XP needed to advance from the current to the next level |
+| `progressToNext` | number | No | Fraction `0..1` of progress toward the next level |
+
+XP is earned on every buy and sell. A level-up additionally creates an `InvestorLevelUp`
+notification.
 
 ---
 

@@ -127,7 +127,7 @@ Features:
 * Daily rewards
 * Login bonuses
 * Achievements
-* Investor levels
+* Investor levels — DONE (XP from trading volume; osu!-style curve soft-capped at level 100; cosmetic titles; `GET /investor/level`, `investorLevel` on `/me`, `InvestorLevelUp` notification on level-up)
 * Missions
 
 Exit Criteria:
