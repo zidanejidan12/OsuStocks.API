@@ -333,6 +333,47 @@ Indexes:
 
 ---
 
+## user_achievements
+
+Purpose:
+
+One-time achievement unlocks (Phase 3). Only unlocks are stored; progress is derived from trades and investor level.
+
+Columns:
+
+* id (uuid)
+* user_id (uuid)
+* achievement_code (varchar 64)
+* reward_credits (bigint)
+* unlocked_at (timestamptz)
+
+Indexes:
+
+* uq_user_achievement_user_code (user_id, achievement_code) UNIQUE
+
+---
+
+## user_mission_completions
+
+Purpose:
+
+Per-period mission completions (Phase 3). Only completions are stored; in-period progress is derived from trades. The unique key makes reward grants idempotent.
+
+Columns:
+
+* id (uuid)
+* user_id (uuid)
+* mission_code (varchar 64)
+* period_key (varchar 16)
+* reward_credits (bigint)
+* completed_at (timestamptz)
+
+Indexes:
+
+* uq_user_mission_completion_user_code_period (user_id, mission_code, period_key) UNIQUE
+
+---
+
 # Foreign Keys
 
 wallets.user_id
@@ -349,6 +390,12 @@ holdings.portfolio_id
 
 holdings.stock_id
 → player_stocks.id
+
+user_achievements.user_id
+→ users.id
+
+user_mission_completions.user_id
+→ users.id
 
 trades.user_id
 → users.id

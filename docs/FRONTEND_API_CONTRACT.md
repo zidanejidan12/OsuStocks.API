@@ -275,6 +275,105 @@ notification.
 
 ---
 
+### Achievements
+
+#### `GET /api/v1/achievements`
+
+Returns every achievement with the caller's derived progress and unlock status. Never 404s.
+
+| | |
+|---|---|
+| Auth | Bearer token |
+| Rate limited | Yes (auth) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "unlockedCount": 2,
+  "totalCount": 9,
+  "items": [
+    {
+      "code": "first-trade",
+      "name": "First Steps",
+      "description": "Execute your first trade.",
+      "category": "Trading",
+      "metric": "TotalTrades",
+      "threshold": 1,
+      "currentValue": 1,
+      "rewardCredits": 1000,
+      "unlocked": true,
+      "unlockedAt": "2026-06-14T10:00:00Z"
+    }
+  ]
+}
+```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `unlockedCount` | int | No | How many of the caller's achievements are unlocked |
+| `totalCount` | int | No | Total achievements in the catalog |
+| `items[].metric` | string | No | `TotalTrades` / `TotalVolume` / `DistinctStocksTraded` / `InvestorLevel` |
+| `items[].currentValue` | long | No | Derived progress, capped at `threshold` |
+| `items[].rewardCredits` | long | No | Credits granted on unlock |
+| `items[].unlocked` | bool | No | Whether the caller has unlocked it |
+| `items[].unlockedAt` | datetime | Yes | When unlocked (null if locked) |
+
+Unlocking grants credits (`AchievementReward` ledger entry) and an `AchievementUnlocked`
+notification. Level-based achievements unlock on the next trade after the level is reached.
+
+---
+
+### Missions
+
+#### `GET /api/v1/missions`
+
+Returns the caller's current daily and weekly missions with derived progress. Never 404s.
+
+| | |
+|---|---|
+| Auth | Bearer token |
+| Rate limited | Yes (auth) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "code": "daily-trade-3",
+      "name": "Daily Grind",
+      "description": "Execute 3 trades today.",
+      "period": "Daily",
+      "periodKey": "2026-06-14",
+      "metric": "TradesInPeriod",
+      "target": 3,
+      "currentValue": 2,
+      "rewardCredits": 3000,
+      "completed": false,
+      "completedAt": null,
+      "resetsAt": "2026-06-15T00:00:00Z"
+    }
+  ]
+}
+```
+
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `items[].period` | string | No | `Daily` or `Weekly` |
+| `items[].periodKey` | string | No | UTC day `yyyy-MM-dd` (daily) or ISO week `yyyy-Www` (weekly) |
+| `items[].metric` | string | No | `TradesInPeriod` / `VolumeInPeriod` / `DistinctStocksInPeriod` |
+| `items[].currentValue` | long | No | Derived in-period progress, capped at `target` |
+| `items[].rewardCredits` | long | No | Credits granted on completion |
+| `items[].completed` | bool | No | Whether completed this period |
+| `items[].completedAt` | datetime | Yes | When completed (null if not) |
+| `items[].resetsAt` | datetime | No | Exclusive end of the current period (next reset) |
+
+Completing a mission grants credits (`MissionReward` ledger entry) and a `MissionCompleted`
+notification. Reward credits are neutral on the profit leaderboard.
+
+---
+
 ### Market
 
 All market endpoints require authentication.

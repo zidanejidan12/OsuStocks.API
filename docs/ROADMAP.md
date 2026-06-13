@@ -126,9 +126,9 @@ Features:
 
 * Daily rewards
 * Login bonuses
-* Achievements
+* Achievements — DONE (static catalog of one-time milestone unlocks derived from trade history + investor level; credit rewards + named badges; `GET /achievements`; `AchievementUnlocked` notification)
 * Investor levels — DONE (XP from trading volume; osu!-style curve soft-capped at level 100; cosmetic titles; `GET /investor/level`, `investorLevel` on `/me`, `InvestorLevelUp` notification on level-up)
-* Missions
+* Missions — DONE (daily + weekly tasks derived from per-period trade activity; credit rewards; `GET /missions`; `MissionCompleted` notification; no reset job — periods roll with the UTC clock)
 
 Exit Criteria:
 

@@ -81,6 +81,8 @@ Types:
 * DailyReward
 * AdminGrant
 * AdminDeduction
+* MissionReward
+* AchievementReward
 
 Rules:
 
@@ -343,6 +345,56 @@ Rules:
 * XP = floor of gross traded credits (UnitPrice × Quantity) per executed buy or sell.
 * Level curve is osu!-style: strictly increasing per level, soft-capped at level 100
   (each level beyond 100 costs a flat 100,000,000,000 XP). Levels are cosmetic (titles only).
+
+---
+
+# Aggregate: UserAchievement
+
+Purpose:
+
+Records that a user has unlocked a catalog achievement (Phase 3). Achievements are one-time
+milestones from a static, code-defined catalog; only unlocks are stored, progress is derived.
+
+Attributes:
+
+* Id
+* UserId
+* AchievementCode (catalog code, e.g. "first-trade")
+* RewardCredits (credits granted on unlock)
+* UnlockedAt
+
+Rules:
+
+* One row per (UserId, AchievementCode); unlocks are permanent and idempotent.
+* Unlocked once the user's lifetime metric (trade count / volume / distinct stocks bought /
+  investor level — derived on demand) reaches the catalog threshold.
+* Unlock grants credits via an `AchievementReward` wallet transaction and a notification.
+
+---
+
+# Aggregate: UserMissionCompletion
+
+Purpose:
+
+Records that a user completed a catalog mission for a specific period (Phase 3). Missions are
+recurring daily/weekly tasks; only completions are stored, in-period progress is derived from
+trades. No reset job exists — periods roll with the UTC clock.
+
+Attributes:
+
+* Id
+* UserId
+* MissionCode (catalog code, e.g. "daily-trade-3")
+* PeriodKey (daily "yyyy-MM-dd" or weekly ISO "yyyy-'W'ww", UTC)
+* RewardCredits (credits granted on completion)
+* CompletedAt
+
+Rules:
+
+* One row per (UserId, MissionCode, PeriodKey); completion is idempotent.
+* Completed once the user's in-period metric (trades / volume / distinct stocks within the
+  period window — derived on demand) reaches the catalog target.
+* Completion grants credits via a `MissionReward` wallet transaction and a notification.
 
 ---
 
