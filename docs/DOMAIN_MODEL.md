@@ -319,6 +319,33 @@ Rules:
 
 ---
 
+# Aggregate: InvestorProfile
+
+Purpose:
+
+Per-user investor progression (Phase 3 economy expansion). Tracks lifetime XP earned from
+trading and the derived investor level.
+
+Attributes:
+
+* Id
+* UserId (unique)
+* TotalXp (lifetime XP; source of truth)
+* Level (denormalised from TotalXp; minimum 1)
+* LastLevelUpAt (optional)
+* CreatedAt / CreatedBy / UpdatedAt / UpdatedBy
+* RowVersion (optimistic concurrency)
+
+Rules:
+
+* One profile per user; created lazily on the user's first XP-earning trade.
+* TotalXp only ever increases. Level is recomputed from TotalXp via the level curve.
+* XP = floor of gross traded credits (UnitPrice × Quantity) per executed buy or sell.
+* Level curve is osu!-style: strictly increasing per level, soft-capped at level 100
+  (each level beyond 100 costs a flat 100,000,000,000 XP). Levels are cosmetic (titles only).
+
+---
+
 # Domain Events
 
 TopPlayDetected

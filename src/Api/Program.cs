@@ -9,6 +9,7 @@ using OsuStocks.Api.Common;
 using OsuStocks.Api.Middleware;
 using OsuStocks.Api.Security;
 using OsuStocks.Application;
+using OsuStocks.Application.Features.Investor.GetInvestorLevel;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetOsuLoginUrl;
 using OsuStocks.Application.Features.OsuIntegration.Auth.HandleOsuCallback;
@@ -286,7 +287,8 @@ authGroup.MapGet("/me", async (
         username = result.Value.Username,
         avatarUrl = result.Value.AvatarUrl,
         countryCode = result.Value.CountryCode,
-        role = result.Value.Role
+        role = result.Value.Role,
+        investorLevel = result.Value.InvestorLevel
     });
 })
 .RequireAuthorization();
@@ -894,6 +896,37 @@ notificationsGroup.MapPost("/read-all", async (
     }
 
     return Results.Ok(new { markedRead = result.Value });
+});
+
+var investorGroup = app.MapGroup("/api/v1/investor")
+    .RequireAuthorization();
+
+investorGroup.MapGet("/level", async (
+    ClaimsPrincipal principal,
+    ISender sender,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    if (!TryResolveUserId(principal, out var userId))
+    {
+        return UnauthorizedResult(httpContext);
+    }
+
+    var result = await sender.Send(new GetInvestorLevelQuery(userId), cancellationToken);
+    if (!result.IsSuccess || result.Value is null)
+    {
+        return result.Error!.ToErrorResult(httpContext);
+    }
+
+    return Results.Ok(new
+    {
+        level = result.Value.Level,
+        title = result.Value.Title,
+        totalXp = result.Value.TotalXp,
+        xpIntoLevel = result.Value.XpIntoLevel,
+        xpForNextLevel = result.Value.XpForNextLevel,
+        progressToNext = result.Value.ProgressToNext
+    });
 });
 
 var adminGroup = app.MapGroup("/api/v1/admin")
