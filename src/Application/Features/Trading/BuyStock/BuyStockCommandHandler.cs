@@ -79,6 +79,7 @@ public sealed class BuyStockCommandHandler(
             return Result.Failure<BuyStockResponse>(positionResult.Error!.Code, positionResult.Error.Message);
         }
 
+        var executedAt = DateTimeOffset.UtcNow;
         var unitPrice = stock.CurrentPrice;
         var totalAmount = unitPrice * request.Quantity;
 
@@ -132,7 +133,7 @@ public sealed class BuyStockCommandHandler(
             Quantity = request.Quantity,
             UnitPrice = unitPrice,
             TotalAmount = totalAmount,
-            ExecutedAt = DateTimeOffset.UtcNow
+            ExecutedAt = executedAt
         };
         await tradeRepository.AddAsync(trade, cancellationToken);
 
@@ -143,14 +144,14 @@ public sealed class BuyStockCommandHandler(
             TransactionType = WalletTransactionType.BuyStock,
             Amount = totalAmount,
             ReferenceId = trade.Id,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = executedAt
         };
         await walletTransactionRepository.AddAsync(walletTransaction, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await publisher.Publish(new BuyOrderExecutedNotification(
-            new BuyOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, DateTimeOffset.UtcNow)), cancellationToken);
+            new BuyOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, executedAt)), cancellationToken);
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
