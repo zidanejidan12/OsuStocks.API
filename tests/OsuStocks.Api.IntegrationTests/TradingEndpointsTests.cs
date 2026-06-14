@@ -84,6 +84,7 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
         buyResponse.EnsureSuccessStatusCode();
 
         decimal walletAfterBuyBalance;
+        decimal rewardCreditsAfterBuy;
         Guid walletId;
 
         using (var scope = factory.Services.CreateScope())
@@ -99,12 +100,19 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
                 .Where(x => x.WalletId == walletAfterBuy.Id)
                 .ToListAsync();
 
-            var buyLedgerEntry = Assert.Single(walletTransactionsAfterBuy);
-            Assert.Equal(WalletTransactionType.BuyStock, buyLedgerEntry.TransactionType);
+            // The first buy also unlocks the first-trade achievement, which credits a reward via its
+            // own ledger entry. Assert the trade entry specifically and account for reward credits.
+            var buyLedgerEntry = Assert.Single(
+                walletTransactionsAfterBuy, x => x.TransactionType == WalletTransactionType.BuyStock);
             Assert.Equal(1000m, buyLedgerEntry.Amount);
+
+            rewardCreditsAfterBuy = walletTransactionsAfterBuy
+                .Where(x => x.TransactionType is WalletTransactionType.AchievementReward
+                    or WalletTransactionType.MissionReward)
+                .Sum(x => x.Amount);
         }
 
-        Assert.Equal(999000m, walletAfterBuyBalance);
+        Assert.Equal(1_000_000m - 1000m + rewardCreditsAfterBuy, walletAfterBuyBalance);
 
         var sellResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/sell",
@@ -144,17 +152,28 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
             var buyTrade = trades.Single(x => x.TradeType == TradeType.Buy);
             var sellTrade = trades.Single(x => x.TradeType == TradeType.Sell);
 
-            var expectedBalance = 1_000_000m - buyTrade.TotalAmount + sellTrade.TotalAmount;
-            Assert.Equal(expectedBalance, walletAfterSell.Balance);
-
             var ledgerAfterSell = await dbContext.WalletTransactions
                 .AsNoTracking()
                 .Where(x => x.WalletId == walletId)
                 .ToListAsync();
 
-            Assert.Equal(2, ledgerAfterSell.Count);
-            Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.BuyStock);
-            Assert.Contains(ledgerAfterSell, x => x.TransactionType == WalletTransactionType.SellStock);
+            // Reward credits (e.g. the first-trade achievement) post their own ledger entries and
+            // raise the balance, so factor them in and assert the trade ledger entries specifically.
+            var rewardCredits = ledgerAfterSell
+                .Where(x => x.TransactionType is WalletTransactionType.AchievementReward
+                    or WalletTransactionType.MissionReward)
+                .Sum(x => x.Amount);
+
+            var expectedBalance = 1_000_000m - buyTrade.TotalAmount + sellTrade.TotalAmount + rewardCredits;
+            Assert.Equal(expectedBalance, walletAfterSell.Balance);
+
+            var tradeLedger = ledgerAfterSell
+                .Where(x => x.TransactionType is WalletTransactionType.BuyStock
+                    or WalletTransactionType.SellStock)
+                .ToList();
+            Assert.Equal(2, tradeLedger.Count);
+            Assert.Contains(tradeLedger, x => x.TransactionType == WalletTransactionType.BuyStock);
+            Assert.Contains(tradeLedger, x => x.TransactionType == WalletTransactionType.SellStock);
 
             var updatedStock = await dbContext.PlayerStocks.AsNoTracking().SingleAsync(x => x.Id == stockId);
             Assert.True(updatedStock.CurrentPrice >= 1m);
