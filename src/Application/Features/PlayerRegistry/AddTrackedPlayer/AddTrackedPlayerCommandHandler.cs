@@ -16,7 +16,13 @@ public sealed class AddTrackedPlayerCommandHandler(
     IApplicationDbContext dbContext)
     : IRequestHandler<AddTrackedPlayerCommand, Result<AddTrackedPlayerResponse>>
 {
-    private const decimal InitialStockPrice = 100m;
+    // Rank-based opening price: a power-law curve over global rank so stronger players list higher.
+    // price = TopPrice * rank^(-Decay), floored at MinPrice. Tuned so rank 1 ≈ 1000 and rank 500 ≈ 100.
+    // Unranked players (no global rank) fall back to the neutral baseline.
+    private const decimal TopPrice = 1000m;
+    private const double RankDecay = 0.37;
+    private const decimal MinPrice = 1m;
+    private const decimal UnrankedPrice = 100m;
 
     public async Task<Result<AddTrackedPlayerResponse>> Handle(
         AddTrackedPlayerCommand request,
@@ -61,7 +67,7 @@ public sealed class AddTrackedPlayerCommandHandler(
             {
                 Id = Guid.NewGuid(),
                 TrackedPlayerId = trackedPlayer.Id,
-                CurrentPrice = InitialStockPrice,
+                CurrentPrice = ComputeInitialStockPrice(osuUser.GlobalRank),
                 DemandScore = 0m,
                 PerformanceScore = 0m,
                 CreatedAt = now,
@@ -95,5 +101,16 @@ public sealed class AddTrackedPlayerCommandHandler(
         {
             return Result.Failure<AddTrackedPlayerResponse>("OAUTH_PROCESSING_FAILED", ex.Message);
         }
+    }
+
+    private static decimal ComputeInitialStockPrice(int? globalRank)
+    {
+        if (globalRank is null or <= 0)
+        {
+            return UnrankedPrice;
+        }
+
+        var price = (decimal)((double)TopPrice * Math.Pow(globalRank.Value, -RankDecay));
+        return Math.Round(Math.Max(price, MinPrice), 2);
     }
 }
