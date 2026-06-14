@@ -40,6 +40,33 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
                 topScore.Beatmapset?.Title);
     }
 
+    public async Task<IReadOnlyList<OsuTopScore>> GetTopScoresAsync(
+        long osuUserId,
+        string accessToken,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var boundedLimit = Math.Clamp(limit, 1, 100);
+        var scores = await SendAsync<List<OsuTopScoreResponse>>(
+            $"users/{osuUserId}/scores/best?mode=osu&limit={boundedLimit}",
+            accessToken,
+            cancellationToken);
+
+        if (scores is null)
+        {
+            return [];
+        }
+
+        return scores
+            .Select(static score => new OsuTopScore(
+                score.Id,
+                score.Pp,
+                score.Beatmapset?.Covers?.Cover2x ?? score.Beatmapset?.Covers?.Cover,
+                score.Beatmapset?.Title,
+                score.CreatedAt))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
         string query,
         string accessToken,
@@ -168,6 +195,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
 
         [JsonPropertyName("pp")]
         public decimal? Pp { get; init; }
+
+        [JsonPropertyName("created_at")]
+        public DateTimeOffset? CreatedAt { get; init; }
 
         [JsonPropertyName("beatmapset")]
         public OsuBeatmapsetResponse? Beatmapset { get; init; }

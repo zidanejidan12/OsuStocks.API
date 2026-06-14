@@ -47,6 +47,22 @@ internal sealed class FakeOsuApiClient : IOsuApiClient
         return Task.FromResult<OsuTopScore?>(new OsuTopScore(user.TopScoreId.Value, user.TopScorePp));
     }
 
+    public Task<IReadOnlyList<OsuTopScore>> GetTopScoresAsync(
+        long osuUserId,
+        string accessToken,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var user = Users.FirstOrDefault(x => x.OsuUserId == osuUserId);
+        if (user?.TopScoreId is null)
+        {
+            return Task.FromResult<IReadOnlyList<OsuTopScore>>([]);
+        }
+
+        return Task.FromResult<IReadOnlyList<OsuTopScore>>(
+            [new OsuTopScore(user.TopScoreId.Value, user.TopScorePp)]);
+    }
+
     public Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
         string query,
         string accessToken,
