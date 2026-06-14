@@ -31,7 +31,13 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
     {
         var topScore = await GetTopScoreInternalAsync(osuUserId, accessToken, cancellationToken);
 
-        return topScore is null ? null : new OsuTopScore(topScore.Id, topScore.Pp);
+        return topScore is null
+            ? null
+            : new OsuTopScore(
+                topScore.Id,
+                topScore.Pp,
+                topScore.Beatmapset?.Covers?.Cover2x ?? topScore.Beatmapset?.Covers?.Cover,
+                topScore.Beatmapset?.Title);
     }
 
     public async Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
@@ -84,7 +90,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
             user.Statistics?.GlobalRank,
             topScore?.Id,
             topScore?.Pp,
-            user.CountryCode);
+            user.CountryCode,
+            topScore?.Beatmapset?.Covers?.Cover2x ?? topScore?.Beatmapset?.Covers?.Cover,
+            topScore?.Beatmapset?.Title);
     }
 
     private async Task<OsuTopScoreResponse?> GetTopScoreInternalAsync(
@@ -160,5 +168,26 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
 
         [JsonPropertyName("pp")]
         public decimal? Pp { get; init; }
+
+        [JsonPropertyName("beatmapset")]
+        public OsuBeatmapsetResponse? Beatmapset { get; init; }
+    }
+
+    private sealed class OsuBeatmapsetResponse
+    {
+        [JsonPropertyName("title")]
+        public string? Title { get; init; }
+
+        [JsonPropertyName("covers")]
+        public OsuBeatmapCoversResponse? Covers { get; init; }
+    }
+
+    private sealed class OsuBeatmapCoversResponse
+    {
+        [JsonPropertyName("cover@2x")]
+        public string? Cover2x { get; init; }
+
+        [JsonPropertyName("cover")]
+        public string? Cover { get; init; }
     }
 }

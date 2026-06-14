@@ -80,7 +80,9 @@ public sealed class PlayerSynchronizationService(
                     latestProfile = latestProfile with
                     {
                         TopScoreId = topScore?.Id,
-                        TopScorePp = topScore?.Pp
+                        TopScorePp = topScore?.Pp,
+                        TopScoreCoverUrl = topScore?.CoverUrl,
+                        TopScoreTitle = topScore?.Title
                     };
                 }
                 else
