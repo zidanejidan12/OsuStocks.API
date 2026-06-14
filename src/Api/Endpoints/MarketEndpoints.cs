@@ -1,5 +1,6 @@
 using MediatR;
 using OsuStocks.Api.Common;
+using OsuStocks.Application.Features.Market.GetLiveMovers;
 using OsuStocks.Application.Features.Market.GetMarketOverview;
 using OsuStocks.Application.Features.Market.GetMarketStockDetails;
 using OsuStocks.Application.Features.Market.GetMarketStockHistory;
@@ -17,6 +18,34 @@ internal static class MarketEndpoints
         var marketGroup = app.MapGroup("/api/v1/market")
             .RequireAuthorization()
             .WithTags("Market");
+
+        // Public: powers the logged-out landing-page live ticker. Read-only, non-sensitive
+        // (public osu! player names, prices, 24h change), so it opts out of the group's auth.
+        marketGroup.MapGet("/movers", async (
+            int? limit,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(new GetLiveMoversQuery(limit ?? 8), cancellationToken);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.Ok(new
+            {
+                items = result.Value.Items.Select(x => new
+                {
+                    stockId = x.StockId,
+                    playerName = x.PlayerName,
+                    avatarUrl = x.AvatarUrl,
+                    currentPrice = x.CurrentPrice,
+                    priceChange24h = x.PriceChange24h
+                })
+            });
+        })
+        .AllowAnonymous();
 
         marketGroup.MapGet("", async (
             ISender sender,

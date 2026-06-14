@@ -84,6 +84,25 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
         return Task.FromResult(new MarketStocksPageReadModel(items, totalCount));
     }
 
+    public Task<IReadOnlyList<MarketStockListItemReadModel>> GetTopMoversAsync(int limit, CancellationToken cancellationToken = default)
+    {
+        var movers = _stocks
+            .OrderByDescending(x => Math.Abs(x.PriceChange24h))
+            .ThenByDescending(x => x.CurrentPrice)
+            .Take(Math.Clamp(limit, 1, 50))
+            .Select(x => new MarketStockListItemReadModel(
+                x.StockId,
+                x.PlayerName,
+                x.AvatarUrl,
+                x.CountryCode,
+                x.CurrentPrice,
+                x.Volume,
+                x.PriceChange24h))
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<MarketStockListItemReadModel>>(movers);
+    }
+
     public Task<MarketStockDetailsReadModel?> GetStockDetailsAsync(Guid stockId, CancellationToken cancellationToken = default)
     {
         var stock = _stocks.FirstOrDefault(x => x.StockId == stockId);
