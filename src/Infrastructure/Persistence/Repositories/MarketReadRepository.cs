@@ -75,6 +75,23 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
         return new MarketStocksPageReadModel(pageItems, totalCount);
     }
 
+    public async Task<IReadOnlyList<MarketStockListItemReadModel>> GetTopMoversAsync(
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        // The 24h change is computed in memory (see GetStocksAsync), so materialize the small tracked
+        // set and rank by the largest absolute move — gainers and losers both — for the live ticker.
+        var rows = await BuildStockMetricRowQuery(DateTimeOffset.UtcNow.AddHours(-24))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(ToListItem)
+            .OrderByDescending(x => Math.Abs(x.PriceChange24h))
+            .ThenByDescending(x => x.CurrentPrice)
+            .Take(Math.Clamp(limit, 1, 50))
+            .ToList();
+    }
+
     public async Task<MarketStockDetailsReadModel?> GetStockDetailsAsync(
         Guid stockId,
         CancellationToken cancellationToken = default)
