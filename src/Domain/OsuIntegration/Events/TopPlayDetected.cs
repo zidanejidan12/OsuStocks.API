@@ -5,5 +5,7 @@ public sealed record TopPlayDetected(
     long? PreviousTopScoreId,
     long NewTopScoreId,
     decimal? NewTopScorePp,
-    DateTimeOffset OccurredAt)
+    DateTimeOffset OccurredAt,
+    string? CoverUrl = null,
+    string? Title = null)
     : OsuDomainEvent("TopPlayDetected", TrackedPlayerId, OccurredAt);
