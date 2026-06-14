@@ -28,6 +28,11 @@ public sealed class PlayerSynchronizationService(
     // saturate that budget without opening hundreds of connections at once for a large tier.
     private const int MaxFetchConcurrency = 10;
 
+    // How many of a player's best plays to inspect each cycle. Any of these that were set since the
+    // previous snapshot is surfaced as a top play (so the stock page shows recent beatmap-rich plays,
+    // not only changes to the #1).
+    private const int TopScoreFetchCount = 10;
+
     public async Task<PlayerSynchronizationSummary> SynchronizeTrackedPlayersAsync(
         TrackingTier? tier = null,
         CancellationToken cancellationToken = default)
@@ -69,14 +74,17 @@ public sealed class PlayerSynchronizationService(
                     cancellationToken);
 
                 // A new top play always raises total pp, so when pp is unchanged the previous top
-                // score still stands and we can skip the extra best-score API call.
+                // score still stands and we can skip the extra best-scores API call.
+                IReadOnlyList<OsuTopScore> topScores = [];
                 if (previousSnapshot is null || latestProfile.CurrentPp != previousSnapshot.CurrentPp)
                 {
-                    var topScore = await osuApiClient.GetTopScoreAsync(
+                    topScores = await osuApiClient.GetTopScoresAsync(
                         trackedPlayer.OsuUserId,
                         osuToken.AccessToken,
+                        TopScoreFetchCount,
                         cancellationToken);
 
+                    var topScore = topScores.Count > 0 ? topScores[0] : null;
                     latestProfile = latestProfile with
                     {
                         TopScoreId = topScore?.Id,
@@ -94,7 +102,7 @@ public sealed class PlayerSynchronizationService(
                     };
                 }
 
-                return new PlayerFetchResult(trackedPlayer, previousSnapshot, latestProfile);
+                return new PlayerFetchResult(trackedPlayer, previousSnapshot, latestProfile, topScores);
             }
             catch (Exception ex)
                 when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
@@ -118,7 +126,7 @@ public sealed class PlayerSynchronizationService(
         var eventsDetected = 0;
         var rankImprovementsDetected = 0;
 
-        foreach (var (trackedPlayer, previousSnapshot, latestProfile) in fetched)
+        foreach (var (trackedPlayer, previousSnapshot, latestProfile, topScores) in fetched)
         {
             // Keep the player's display fields fresh from osu! (avatar + country flag). The tracked
             // entity is read AsNoTracking, so persist via the repository's Update when they change.
@@ -157,14 +165,39 @@ public sealed class PlayerSynchronizationService(
                 rankImprovementsDetected++;
             }
 
-            if (comparison.Events.Count > 0)
+            // Compare already flags a change to the #1 play. Surface every other newly-set play in
+            // the player's top-N (by score submission time) too, so each beatmap-rich play that moved
+            // the stock appears — not only changes to the single best score. Skip the #1 to avoid
+            // double-counting it with Compare's event.
+            var events = new List<OsuDomainEvent>(comparison.Events);
+            if (previousSnapshot is not null)
+            {
+                foreach (var score in topScores)
+                {
+                    if (score.SetAt is { } setAt
+                        && setAt > previousSnapshot.CapturedAt
+                        && score.Id != latestProfile.TopScoreId)
+                    {
+                        events.Add(new TopPlayDetected(
+                            trackedPlayer.Id,
+                            null,
+                            score.Id,
+                            score.Pp,
+                            now,
+                            score.CoverUrl,
+                            score.Title));
+                    }
+                }
+            }
+
+            if (events.Count > 0)
             {
                 var playerStock = await playerStockRepository
                     .GetByTrackedPlayerIdAsync(trackedPlayer.Id, cancellationToken);
 
                 if (playerStock is not null)
                 {
-                    foreach (var domainEvent in comparison.Events)
+                    foreach (var domainEvent in events)
                     {
                         var marketEvent = new MarketEvent
                         {
@@ -195,7 +228,7 @@ public sealed class PlayerSynchronizationService(
                     }
                 }
 
-                eventsDetected += comparison.Events.Count;
+                eventsDetected += events.Count;
             }
         }
 
@@ -211,5 +244,6 @@ public sealed class PlayerSynchronizationService(
     private sealed record PlayerFetchResult(
         TrackedPlayer TrackedPlayer,
         PlayerSnapshot? PreviousSnapshot,
-        OsuUserProfile LatestProfile);
+        OsuUserProfile LatestProfile,
+        IReadOnlyList<OsuTopScore> TopScores);
 }

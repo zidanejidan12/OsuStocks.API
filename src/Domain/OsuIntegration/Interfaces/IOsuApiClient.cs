@@ -17,6 +17,12 @@ public interface IOsuApiClient
         string accessToken,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<OsuTopScore>> GetTopScoresAsync(
+        long osuUserId,
+        string accessToken,
+        int limit = 10,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
         string query,
         string accessToken,
