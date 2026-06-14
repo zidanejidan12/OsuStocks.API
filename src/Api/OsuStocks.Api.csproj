@@ -23,4 +23,9 @@
     <UserSecretsId>9069f9b1-a932-4f79-ac45-3ee6aa86dbaa</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Expose internal middleware/helpers (e.g. GlobalExceptionHandlerMiddleware) to the test project. -->
+    <InternalsVisibleTo Include="OsuStocks.Api.IntegrationTests" />
+  </ItemGroup>
+
 </Project>
