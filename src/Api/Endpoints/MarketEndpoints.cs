@@ -133,7 +133,9 @@ internal static class MarketEndpoints
                 countryCode = result.Value.CountryCode,
                 currentPrice = result.Value.CurrentPrice,
                 volume = result.Value.Volume,
-                priceChange24h = result.Value.PriceChange24h
+                priceChange24h = result.Value.PriceChange24h,
+                globalRank = result.Value.GlobalRank,
+                currentPp = result.Value.CurrentPp
             });
         });
 

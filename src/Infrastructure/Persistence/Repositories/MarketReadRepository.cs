@@ -105,6 +105,22 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             return null;
         }
 
+        // Latest synced rank/pp for this one player — a cheap correlated lookup. We keep this
+        // off the market-list query so the 5,000-row board stays fast.
+        var rankInfo = await (
+            from stock in dbContext.PlayerStocks.AsNoTracking()
+            where stock.Id == stockId
+            let latest = dbContext.PlayerSnapshots
+                .Where(s => s.TrackedPlayerId == stock.TrackedPlayerId)
+                .OrderByDescending(s => s.CapturedAt)
+                .FirstOrDefault()
+            select new
+            {
+                GlobalRank = latest != null ? latest.GlobalRank : null,
+                CurrentPp = latest != null ? (decimal?)latest.CurrentPp : null
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
         return new MarketStockDetailsReadModel(
             row.StockId,
             row.PlayerName,
@@ -112,7 +128,9 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             row.CountryCode,
             row.CurrentPrice,
             row.Volume,
-            ComputeChange24h(row));
+            ComputeChange24h(row),
+            rankInfo?.GlobalRank,
+            rankInfo?.CurrentPp);
     }
 
     public async Task<IReadOnlyList<MarketStockHistoryPointReadModel>> GetStockHistoryAsync(
