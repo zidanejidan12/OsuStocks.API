@@ -19,11 +19,11 @@ VALUES (
 -- 2. Users (user1 = admin, rest = regular users)
 -- ============================================================
 INSERT INTO users (id, osu_user_id, username, avatar_url, role, created_at, created_by, last_login_at) VALUES
-('b0000000-0000-0000-0000-000000000001', 4787150,  'Cookiezi',   'https://a.ppy.sh/4787150',  'Admin', NOW() AT TIME ZONE 'UTC' - INTERVAL '30 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '1 day'),
-('b0000000-0000-0000-0000-000000000002', 6447454,  'Vaxei',      'https://a.ppy.sh/6447454',  'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '28 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '2 days'),
+('b0000000-0000-0000-0000-000000000001', 124493,   'Cookiezi',   'https://a.ppy.sh/124493',   'Admin', NOW() AT TIME ZONE 'UTC' - INTERVAL '30 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '1 day'),
+('b0000000-0000-0000-0000-000000000002', 4787150,  'Vaxei',      'https://a.ppy.sh/4787150',  'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '28 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '2 days'),
 ('b0000000-0000-0000-0000-000000000003', 7562902,  'Mrekk',      'https://a.ppy.sh/7562902',  'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '25 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '3 days'),
-('b0000000-0000-0000-0000-000000000004', 11367222, 'nyanpotato', 'https://a.ppy.sh/11367222', 'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '20 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '5 days'),
-('b0000000-0000-0000-0000-000000000005', 12408961, 'lifeline',   'https://a.ppy.sh/12408961', 'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '15 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '1 day');
+('b0000000-0000-0000-0000-000000000004', 13211727, 'nyanpotato', 'https://a.ppy.sh/13211727', 'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '20 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '5 days'),
+('b0000000-0000-0000-0000-000000000005', 11367222, 'lifeline',   'https://a.ppy.sh/11367222', 'User',  NOW() AT TIME ZONE 'UTC' - INTERVAL '15 days', 'seed', NOW() AT TIME ZONE 'UTC' - INTERVAL '1 day');
 
 -- ============================================================
 -- 3. Wallets (one per user, started with 10,000)
