@@ -35,4 +35,13 @@ internal sealed class PlayerSnapshotRepository(AppDbContext dbContext) : IPlayer
 
         return snapshots;
     }
+
+    public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+    {
+        // Set-based delete (no entity loading). Only the latest snapshot per player matters for sync,
+        // and players sync at least hourly, so anything older than the cutoff is safe to drop.
+        return dbContext.PlayerSnapshots
+            .Where(x => x.CapturedAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 }

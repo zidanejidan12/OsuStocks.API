@@ -32,6 +32,13 @@ public sealed class OsuSynchronizationRecurringJob(
         return RunTierAsync(TrackingTier.Tier3);
     }
 
+    [AutomaticRetry(Attempts = 3)]
+    [DisableConcurrentExecution(timeoutInSeconds: 30)]
+    public Task RunTier4Async()
+    {
+        return RunTierAsync(TrackingTier.Tier4);
+    }
+
     private async Task RunTierAsync(TrackingTier tier)
     {
         var stopwatch = Stopwatch.StartNew();
