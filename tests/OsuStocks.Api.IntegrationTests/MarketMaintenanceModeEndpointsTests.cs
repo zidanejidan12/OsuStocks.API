@@ -74,7 +74,7 @@ public sealed class MarketMaintenanceModeEndpointsTests
             });
 
             var marketReadRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
-            marketReadRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "maintenance-player", null, null, 100m, 42, 1.5m));
+            marketReadRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "maintenance-player", null, null, 100m, 42, 1.5m, null, null));
         }
 
         var response = await client.GetAsync("/api/v1/market");

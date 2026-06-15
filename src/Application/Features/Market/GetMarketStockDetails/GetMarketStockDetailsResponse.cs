@@ -7,4 +7,6 @@ public sealed record GetMarketStockDetailsResponse(
     string? CountryCode,
     decimal CurrentPrice,
     long Volume,
-    decimal PriceChange24h);
+    decimal PriceChange24h,
+    int? GlobalRank,
+    decimal? CurrentPp);
