@@ -26,6 +26,19 @@ public sealed class OsuSynchronizationRecurringJobRegistrar(IRecurringJobManager
             job => job.RunTier3Async(),
             "9-59/15 * * * *");
 
+        // Tier4 is the long tail (~1000-5000): hourly at :13, a minute that doesn't coincide with the
+        // Tier2 (:02,:07,:12,...) or Tier3 (:09,:24,:39,:54) ticks, so the big batch never piles onto
+        // another heavy tier and blow past osu!'s rate limit.
+        recurringJobManager.AddOrUpdate<OsuSynchronizationRecurringJob>(
+            "osu-sync-tier4",
+            job => job.RunTier4Async(),
+            "13 * * * *");
+
+        recurringJobManager.AddOrUpdate<SnapshotRetentionRecurringJob>(
+            "snapshot-retention",
+            job => job.RunAsync(),
+            Cron.Daily(4, 0));
+
         recurringJobManager.AddOrUpdate<InactivityDecayRecurringJob>(
             "inactivity-decay",
             job => job.RunAsync(),
