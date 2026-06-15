@@ -11,7 +11,12 @@ public sealed class ListTrackedPlayersQueryHandler(ITrackedPlayerRepository trac
         ListTrackedPlayersQuery request,
         CancellationToken cancellationToken)
     {
-        var trackedPlayers = await trackedPlayerRepository.GetAllAsync(request.IsActive, cancellationToken);
+        var (trackedPlayers, totalCount) = await trackedPlayerRepository.GetPagedAsync(
+            request.IsActive,
+            request.Search,
+            request.Page,
+            request.PageSize,
+            cancellationToken);
 
         var items = trackedPlayers
             .Select(player => new TrackedPlayerListItemResponse(
@@ -26,6 +31,6 @@ public sealed class ListTrackedPlayersQueryHandler(ITrackedPlayerRepository trac
                 player.UpdatedAt))
             .ToList();
 
-        return Result.Success(new ListTrackedPlayersResponse(items));
+        return Result.Success(new ListTrackedPlayersResponse(items, totalCount, request.Page, request.PageSize));
     }
 }
