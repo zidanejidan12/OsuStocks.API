@@ -360,10 +360,12 @@ ORDER BY o.bucket_start ASC;";
             "price_desc" => items.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
             "name_asc" => items.OrderBy(x => x.PlayerName),
             "name_desc" => items.OrderByDescending(x => x.PlayerName),
-            "volume_asc" => items.OrderBy(x => x.Volume).ThenBy(x => x.PlayerName),
-            "volume_desc" => items.OrderByDescending(x => x.Volume).ThenBy(x => x.PlayerName),
-            "change24h_asc" => items.OrderBy(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
-            "change24h_desc" => items.OrderByDescending(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
+            // Volume/change ties (the whole board when there's been no trading yet) fall back to price
+            // so recognizable top-ranked players surface instead of an alphabetical list of unknowns.
+            "volume_asc" => items.OrderBy(x => x.Volume).ThenByDescending(x => x.CurrentPrice),
+            "volume_desc" => items.OrderByDescending(x => x.Volume).ThenByDescending(x => x.CurrentPrice),
+            "change24h_asc" => items.OrderBy(x => x.PriceChange24h).ThenByDescending(x => x.CurrentPrice),
+            "change24h_desc" => items.OrderByDescending(x => x.PriceChange24h).ThenByDescending(x => x.CurrentPrice),
             _ => items.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName)
         }).ToList();
     }

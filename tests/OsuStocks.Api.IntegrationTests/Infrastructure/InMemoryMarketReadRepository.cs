@@ -59,10 +59,10 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
             "price_desc" => query.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
             "name_asc" => query.OrderBy(x => x.PlayerName),
             "name_desc" => query.OrderByDescending(x => x.PlayerName),
-            "volume_asc" => query.OrderBy(x => x.Volume).ThenBy(x => x.PlayerName),
-            "volume_desc" => query.OrderByDescending(x => x.Volume).ThenBy(x => x.PlayerName),
-            "change24h_asc" => query.OrderBy(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
-            "change24h_desc" => query.OrderByDescending(x => x.PriceChange24h).ThenBy(x => x.PlayerName),
+            "volume_asc" => query.OrderBy(x => x.Volume).ThenByDescending(x => x.CurrentPrice),
+            "volume_desc" => query.OrderByDescending(x => x.Volume).ThenByDescending(x => x.CurrentPrice),
+            "change24h_asc" => query.OrderBy(x => x.PriceChange24h).ThenByDescending(x => x.CurrentPrice),
+            "change24h_desc" => query.OrderByDescending(x => x.PriceChange24h).ThenByDescending(x => x.CurrentPrice),
             _ => query.OrderByDescending(x => x.CurrentPrice).ThenBy(x => x.PlayerName)
         };
 
