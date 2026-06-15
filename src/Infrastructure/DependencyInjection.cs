@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<OsuSynchronizationRecurringJob>();
         services.AddScoped<InactivityDecayRecurringJob>();
         services.AddScoped<WealthSnapshotRecurringJob>();
+        services.AddScoped<SnapshotRetentionRecurringJob>();
         services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
 
         services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();
