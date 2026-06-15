@@ -49,14 +49,14 @@ INSERT INTO portfolios (id, user_id, created_at, created_by) VALUES
 -- 5. Tracked Players (osu! players whose stocks exist)
 -- ============================================================
 INSERT INTO tracked_players (id, osu_user_id, username, tracking_tier, is_active, created_at, created_by) VALUES
-('e0000000-0000-0000-0000-000000000001', 4787150,  'Cookiezi',   'Tier1', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '60 days', 'seed'),
-('e0000000-0000-0000-0000-000000000002', 6447454,  'Vaxei',      'Tier1', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '60 days', 'seed'),
+('e0000000-0000-0000-0000-000000000001', 124493,   'Cookiezi',   'Tier1', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '60 days', 'seed'),
+('e0000000-0000-0000-0000-000000000002', 4787150,  'Vaxei',      'Tier1', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '60 days', 'seed'),
 ('e0000000-0000-0000-0000-000000000003', 7562902,  'mrekk',      'Tier1', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '55 days', 'seed'),
 ('e0000000-0000-0000-0000-000000000004', 4504101,  'WhiteCat',   'Tier2', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '50 days', 'seed'),
-('e0000000-0000-0000-0000-000000000005', 11367222, 'nyanpotato', 'Tier2', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '45 days', 'seed'),
-('e0000000-0000-0000-0000-000000000006', 12408961, 'lifeline',   'Tier2', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '40 days', 'seed'),
+('e0000000-0000-0000-0000-000000000005', 13211727, 'nyanpotato', 'Tier2', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '45 days', 'seed'),
+('e0000000-0000-0000-0000-000000000006', 11367222, 'lifeline',   'Tier2', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '40 days', 'seed'),
 ('e0000000-0000-0000-0000-000000000007', 6304246,  'RyuK',       'Tier3', true,  NOW() AT TIME ZONE 'UTC' - INTERVAL '35 days', 'seed'),
-('e0000000-0000-0000-0000-000000000008', 2558286,  'Aricin',     'Tier3', false, NOW() AT TIME ZONE 'UTC' - INTERVAL '60 days', 'seed');
+('e0000000-0000-0000-0000-000000000008', 1419095,  'Aricin',     'Tier3', false, NOW() AT TIME ZONE 'UTC' - INTERVAL '60 days', 'seed');
 
 -- ============================================================
 -- 6. Player Stocks (one per tracked player)
@@ -216,9 +216,9 @@ INSERT INTO market_events (id, stock_id, event_type, payload, created_at) VALUES
 ('60000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-000000000003', 'PpIncreased',       '{"playerId": 7562902, "username": "mrekk", "ppDelta": 100.0, "newPp": 21100.0}',            NOW() AT TIME ZONE 'UTC' - INTERVAL '20 days'),
 ('60000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000003', 'BuyOrderExecuted',  '{"userId": "b0000000-0000-0000-0000-000000000001", "quantity": 5, "unitPrice": 160.0}',      NOW() AT TIME ZONE 'UTC' - INTERVAL '20 days'),
 ('60000000-0000-0000-0000-000000000004', 'f0000000-0000-0000-0000-000000000001', 'BuyOrderExecuted',  '{"userId": "b0000000-0000-0000-0000-000000000002", "quantity": 3, "unitPrice": 140.0}',      NOW() AT TIME ZONE 'UTC' - INTERVAL '22 days'),
-('60000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000001', 'TopPlayDetected',   '{"playerId": 4787150, "username": "Cookiezi", "scorePp": 1025.0, "previousTopPp": 1018.0}',  NOW() AT TIME ZONE 'UTC' - INTERVAL '5 days'),
-('60000000-0000-0000-0000-000000000006', 'f0000000-0000-0000-0000-000000000008', 'PlayerInactive',    '{"playerId": 2558286, "username": "Aricin", "daysSinceLastActivity": 14}',                   NOW() AT TIME ZONE 'UTC' - INTERVAL '20 days'),
-('60000000-0000-0000-0000-000000000007', 'f0000000-0000-0000-0000-000000000008', 'PlayerInactive',    '{"playerId": 2558286, "username": "Aricin", "daysSinceLastActivity": 21}',                   NOW() AT TIME ZONE 'UTC' - INTERVAL '13 days'),
+('60000000-0000-0000-0000-000000000005', 'f0000000-0000-0000-0000-000000000001', 'TopPlayDetected',   '{"playerId": 124493, "username": "Cookiezi", "scorePp": 1025.0, "previousTopPp": 1018.0}',  NOW() AT TIME ZONE 'UTC' - INTERVAL '5 days'),
+('60000000-0000-0000-0000-000000000006', 'f0000000-0000-0000-0000-000000000008', 'PlayerInactive',    '{"playerId": 1419095, "username": "Aricin", "daysSinceLastActivity": 14}',                   NOW() AT TIME ZONE 'UTC' - INTERVAL '20 days'),
+('60000000-0000-0000-0000-000000000007', 'f0000000-0000-0000-0000-000000000008', 'PlayerInactive',    '{"playerId": 1419095, "username": "Aricin", "daysSinceLastActivity": 21}',                   NOW() AT TIME ZONE 'UTC' - INTERVAL '13 days'),
 ('60000000-0000-0000-0000-000000000008', 'f0000000-0000-0000-0000-000000000004', 'SellOrderExecuted', '{"userId": "b0000000-0000-0000-0000-000000000001", "quantity": 2, "unitPrice": 110.0}',      NOW() AT TIME ZONE 'UTC' - INTERVAL '10 days'),
 ('60000000-0000-0000-0000-000000000009', 'f0000000-0000-0000-0000-000000000003', 'TopPlayDetected',   '{"playerId": 7562902, "username": "mrekk", "scorePp": 1280.0, "previousTopPp": 1250.0}',    NOW() AT TIME ZONE 'UTC' - INTERVAL '3 days');
 
