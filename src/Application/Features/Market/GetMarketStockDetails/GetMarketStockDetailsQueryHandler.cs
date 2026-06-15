@@ -24,6 +24,8 @@ public sealed class GetMarketStockDetailsQueryHandler(IMarketReadRepository mark
             stock.CountryCode,
             stock.CurrentPrice,
             stock.Volume,
-            stock.PriceChange24h));
+            stock.PriceChange24h,
+            stock.GlobalRank,
+            stock.CurrentPp));
     }
 }

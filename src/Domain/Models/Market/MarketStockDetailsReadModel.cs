@@ -7,4 +7,6 @@ public sealed record MarketStockDetailsReadModel(
     string? CountryCode,
     decimal CurrentPrice,
     long Volume,
-    decimal PriceChange24h);
+    decimal PriceChange24h,
+    int? GlobalRank,
+    decimal? CurrentPp);
