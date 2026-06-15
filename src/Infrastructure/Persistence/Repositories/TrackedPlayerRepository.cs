@@ -52,6 +52,49 @@ internal sealed class TrackedPlayerRepository(AppDbContext dbContext) : ITracked
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IReadOnlyList<TrackedPlayer> Items, int TotalCount)> GetPagedAsync(
+        bool? isActive,
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.TrackedPlayers
+            .AsNoTracking()
+            .Include(x => x.Stock)
+            .AsQueryable();
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == isActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            var lowered = term.ToLower();
+            if (long.TryParse(term, out var osuUserId))
+            {
+                query = query.Where(x => x.Username.ToLower().Contains(lowered) || x.OsuUserId == osuUserId);
+            }
+            else
+            {
+                query = query.Where(x => x.Username.ToLower().Contains(lowered));
+            }
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(x => x.TrackingTier)
+            .ThenBy(x => x.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public async Task<IReadOnlyList<TrackedPlayer>> GetActiveAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.TrackedPlayers

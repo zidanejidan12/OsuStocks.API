@@ -8,6 +8,12 @@ public interface ITrackedPlayerRepository
     Task<TrackedPlayer?> GetByOsuUserIdAsync(long osuUserId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrackedPlayer>> GetByOsuUserIdsAsync(IReadOnlyCollection<long> osuUserIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrackedPlayer>> GetAllAsync(bool? isActive = null, CancellationToken cancellationToken = default);
+    Task<(IReadOnlyList<TrackedPlayer> Items, int TotalCount)> GetPagedAsync(
+        bool? isActive,
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrackedPlayer>> GetActiveAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrackedPlayer>> GetActiveByTierAsync(
         OsuStocks.Domain.Common.Enums.TrackingTier tier,
