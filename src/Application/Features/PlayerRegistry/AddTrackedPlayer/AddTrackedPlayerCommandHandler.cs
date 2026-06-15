@@ -83,7 +83,9 @@ public sealed class AddTrackedPlayerCommandHandler(
                 trackedPlayer.OsuUserId,
                 trackedPlayer.Username,
                 trackedPlayer.TrackingTier,
-                trackedPlayer.IsActive));
+                trackedPlayer.IsActive,
+                trackedPlayer.AvatarUrl,
+                stock.Id));
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {

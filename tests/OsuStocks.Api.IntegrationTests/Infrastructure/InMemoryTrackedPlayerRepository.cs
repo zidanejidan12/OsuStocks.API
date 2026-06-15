@@ -93,6 +93,11 @@ internal sealed class InMemoryTrackedPlayerRepository : ITrackedPlayerRepository
         _trackedPlayers[trackedPlayer.Id] = Clone(trackedPlayer)!;
     }
 
+    public void Remove(TrackedPlayer trackedPlayer)
+    {
+        _trackedPlayers.TryRemove(trackedPlayer.Id, out _);
+    }
+
     private static TrackedPlayer? Clone(TrackedPlayer? trackedPlayer)
     {
         if (trackedPlayer is null)
@@ -105,6 +110,8 @@ internal sealed class InMemoryTrackedPlayerRepository : ITrackedPlayerRepository
             Id = trackedPlayer.Id,
             OsuUserId = trackedPlayer.OsuUserId,
             Username = trackedPlayer.Username,
+            AvatarUrl = trackedPlayer.AvatarUrl,
+            CountryCode = trackedPlayer.CountryCode,
             TrackingTier = trackedPlayer.TrackingTier,
             IsActive = trackedPlayer.IsActive,
             CreatedAt = trackedPlayer.CreatedAt,
