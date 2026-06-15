@@ -204,7 +204,9 @@ public sealed class PlayerSynchronizationService(
                             Id = Guid.NewGuid(),
                             StockId = playerStock.Id,
                             EventType = domainEvent.EventType,
-                            Payload = JsonSerializer.Serialize(domainEvent),
+                            // Serialize the runtime type, not the OsuDomainEvent base — otherwise
+                            // System.Text.Json drops every derived field (score id, pp, cover, title).
+                            Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
                             CreatedAt = now
                         };
 
