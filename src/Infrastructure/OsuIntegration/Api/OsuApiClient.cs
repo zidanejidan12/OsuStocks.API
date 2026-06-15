@@ -12,7 +12,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         string accessToken,
         CancellationToken cancellationToken = default)
     {
-        return GetUserInternalAsync("me", accessToken, includeTopScore: true, cancellationToken);
+        // Always the osu! standard ruleset — otherwise the user's default mode (taiko/fruits/mania)
+        // is returned and we'd track the wrong pp/rank for players who default to another mode.
+        return GetUserInternalAsync("me/osu", accessToken, includeTopScore: true, cancellationToken);
     }
 
     public Task<OsuUserProfile> GetUserAsync(
@@ -21,7 +23,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         bool includeTopScore = true,
         CancellationToken cancellationToken = default)
     {
-        return GetUserInternalAsync($"users/{osuUserId}", accessToken, includeTopScore, cancellationToken);
+        // Pin to the osu! standard ruleset (see GetCurrentUserAsync) so a player's default mode
+        // never skews their tracked pp/rank.
+        return GetUserInternalAsync($"users/{osuUserId}/osu", accessToken, includeTopScore, cancellationToken);
     }
 
     public async Task<OsuTopScore?> GetTopScoreAsync(
