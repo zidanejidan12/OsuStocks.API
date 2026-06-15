@@ -36,7 +36,10 @@ internal sealed class TrackedPlayerRepository(AppDbContext dbContext) : ITracked
         bool? isActive = null,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.TrackedPlayers.AsNoTracking().AsQueryable();
+        var query = dbContext.TrackedPlayers
+            .AsNoTracking()
+            .Include(x => x.Stock)
+            .AsQueryable();
 
         if (isActive.HasValue)
         {
@@ -78,5 +81,16 @@ internal sealed class TrackedPlayerRepository(AppDbContext dbContext) : ITracked
     public void Update(TrackedPlayer trackedPlayer)
     {
         dbContext.TrackedPlayers.Update(trackedPlayer);
+    }
+
+    public void Remove(TrackedPlayer trackedPlayer)
+    {
+        var entry = dbContext.Entry(trackedPlayer);
+        if (entry.State == EntityState.Detached)
+        {
+            dbContext.TrackedPlayers.Attach(trackedPlayer);
+        }
+
+        dbContext.TrackedPlayers.Remove(trackedPlayer);
     }
 }

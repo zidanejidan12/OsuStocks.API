@@ -18,4 +18,5 @@ public interface ITradeRepository
         Guid userId,
         DateTimeOffset since,
         CancellationToken cancellationToken = default);
+    Task<bool> ExistsByStockAsync(Guid stockId, CancellationToken cancellationToken = default);
 }

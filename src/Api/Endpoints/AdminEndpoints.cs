@@ -4,6 +4,7 @@ using OsuStocks.Api.Common;
 using OsuStocks.Application.Features.Admin.MarketSettings.GetMarketSettings;
 using OsuStocks.Application.Features.Admin.MarketSettings.UpdateMarketSettings;
 using OsuStocks.Application.Features.PlayerRegistry.AddTrackedPlayer;
+using OsuStocks.Application.Features.PlayerRegistry.DeleteTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.DisableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.EnableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.ListTrackedPlayers;
@@ -116,7 +117,16 @@ internal static class AdminEndpoints
                 return result.Error!.ToErrorResult(httpContext);
             }
 
-            return Results.Ok(new { trackedPlayerId = result.Value.TrackedPlayerId });
+            return Results.Ok(new
+            {
+                trackedPlayerId = result.Value.TrackedPlayerId,
+                osuUserId = result.Value.OsuUserId,
+                username = result.Value.Username,
+                trackingTier = result.Value.TrackingTier.ToString(),
+                isActive = result.Value.IsActive,
+                avatarUrl = result.Value.AvatarUrl,
+                stockId = result.Value.StockId
+            });
         });
 
         trackedPlayersGroup.MapPatch("/{id:guid}/enable", async (
@@ -146,6 +156,22 @@ internal static class AdminEndpoints
         {
             var actor = ResolveActor(principal);
             var result = await sender.Send(new DisableTrackedPlayerCommand(id, actor), cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.NoContent();
+        });
+
+        trackedPlayersGroup.MapDelete("/{id:guid}", async (
+            Guid id,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(new DeleteTrackedPlayerCommand(id), cancellationToken);
 
             if (!result.IsSuccess)
             {
