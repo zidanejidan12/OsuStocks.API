@@ -71,17 +71,28 @@ internal static class AdminEndpoints
 
         trackedPlayersGroup.MapGet("", async (
             bool? isActive,
+            string? search,
+            int? page,
+            int? pageSize,
             ISender sender,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new ListTrackedPlayersQuery(isActive), cancellationToken);
+            var result = await sender.Send(
+                new ListTrackedPlayersQuery(isActive, search, page ?? 1, pageSize ?? 25),
+                cancellationToken);
             if (!result.IsSuccess || result.Value is null)
             {
                 return result.Error!.ToErrorResult(httpContext);
             }
 
-            return Results.Ok(new { items = result.Value.Items });
+            return Results.Ok(new
+            {
+                items = result.Value.Items,
+                totalCount = result.Value.TotalCount,
+                page = result.Value.Page,
+                pageSize = result.Value.PageSize
+            });
         });
 
         trackedPlayersGroup.MapGet("/search", async (
