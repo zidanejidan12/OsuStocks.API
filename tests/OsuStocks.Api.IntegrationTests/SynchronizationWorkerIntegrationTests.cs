@@ -218,6 +218,21 @@ public sealed class SynchronizationWorkerIntegrationTests
             return Task.FromResult<OsuTopScore?>(new OsuTopScore(user.TopScoreId.Value, user.TopScorePp));
         }
 
+        public Task<IReadOnlyList<OsuTopScore>> GetTopScoresAsync(
+            long osuUserId,
+            string accessToken,
+            int limit = 10,
+            CancellationToken cancellationToken = default)
+        {
+            if (!users.TryGetValue(osuUserId, out var user) || user.TopScoreId is null)
+            {
+                return Task.FromResult<IReadOnlyList<OsuTopScore>>([]);
+            }
+
+            return Task.FromResult<IReadOnlyList<OsuTopScore>>(
+                [new OsuTopScore(user.TopScoreId.Value, user.TopScorePp)]);
+        }
+
         public Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
             string query,
             string accessToken,

@@ -6,6 +6,7 @@ using OsuStocks.Application.Features.Market.GetMarketStockHistory;
 using OsuStocks.Application.Features.Market.GetMarketStocks;
 using OsuStocks.Application.Features.Market.GetStockAnalytics;
 using OsuStocks.Application.Features.Market.GetStockCandles;
+using OsuStocks.Application.Features.Market.GetStockTopPlays;
 
 namespace OsuStocks.Api.Endpoints;
 
@@ -148,6 +149,34 @@ internal static class MarketEndpoints
                 timestamp = x.Timestamp,
                 price = x.Price
             }));
+        });
+
+        marketGroup.MapGet("/stocks/{stockId:guid}/top-plays", async (
+            Guid stockId,
+            int? limit,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(new GetStockTopPlaysQuery(stockId, limit ?? 5), cancellationToken);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.Ok(new
+            {
+                items = result.Value.Items.Select(x => new
+                {
+                    scoreId = x.ScoreId,
+                    pp = x.Pp,
+                    coverUrl = x.CoverUrl,
+                    title = x.Title,
+                    percentChange = x.PercentChange,
+                    newPrice = x.NewPrice,
+                    occurredAt = x.OccurredAt
+                })
+            });
         });
 
         marketGroup.MapGet("/stocks/{stockId:guid}/analytics", async (

@@ -15,4 +15,10 @@ public interface IMarketActivityReadRepository
         int skip,
         int take,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StockTopPlayReadModel>> GetTopPlaysByStockAsync(
+        Guid stockId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default);
 }
