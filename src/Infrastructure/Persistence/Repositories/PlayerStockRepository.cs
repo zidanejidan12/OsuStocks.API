@@ -6,14 +6,20 @@ namespace OsuStocks.Infrastructure.Persistence.Repositories;
 
 internal sealed class PlayerStockRepository(AppDbContext dbContext) : IPlayerStockRepository
 {
+    // Tracked (not AsNoTracking): these load a stock that the caller then mutates and Update()s.
+    // When several price-affecting events hit the same stock in one DbContext scope (e.g. a new top
+    // play raises pp, firing both PpIncreased and TopPlayDetected), AsNoTracking returned a fresh
+    // instance each time and the second Update() threw "another instance with the same key is already
+    // being tracked". Tracking makes EF's identity map return the same instance, so repeated
+    // fetch+Update in one scope is safe and concurrency tokens stay in sync.
     public Task<PlayerStock?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return dbContext.PlayerStocks.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        return dbContext.PlayerStocks.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
     public Task<PlayerStock?> GetByTrackedPlayerIdAsync(Guid trackedPlayerId, CancellationToken cancellationToken = default)
     {
-        return dbContext.PlayerStocks.AsNoTracking().FirstOrDefaultAsync(x => x.TrackedPlayerId == trackedPlayerId, cancellationToken);
+        return dbContext.PlayerStocks.FirstOrDefaultAsync(x => x.TrackedPlayerId == trackedPlayerId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<PlayerStock>> GetPagedAsync(
