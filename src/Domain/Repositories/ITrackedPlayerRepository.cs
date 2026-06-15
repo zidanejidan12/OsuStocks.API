@@ -14,4 +14,5 @@ public interface ITrackedPlayerRepository
         CancellationToken cancellationToken = default);
     Task AddAsync(TrackedPlayer trackedPlayer, CancellationToken cancellationToken = default);
     void Update(TrackedPlayer trackedPlayer);
+    void Remove(TrackedPlayer trackedPlayer);
 }

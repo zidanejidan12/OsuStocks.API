@@ -46,6 +46,12 @@ internal sealed class InMemoryTradeRepository : ITradeRepository
         return Task.FromResult(count);
     }
 
+    public Task<bool> ExistsByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
+    {
+        var exists = _tradesById.Values.Any(x => x.StockId == stockId);
+        return Task.FromResult(exists);
+    }
+
     private static Trade? Clone(Trade? trade)
     {
         if (trade is null)

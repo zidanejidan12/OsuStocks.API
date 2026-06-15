@@ -48,4 +48,11 @@ internal sealed class TradeRepository(AppDbContext dbContext) : ITradeRepository
             .Where(x => x.UserId == userId && x.ExecutedAt >= since)
             .CountAsync(cancellationToken);
     }
+
+    public Task<bool> ExistsByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Trades
+            .AsNoTracking()
+            .AnyAsync(x => x.StockId == stockId, cancellationToken);
+    }
 }
