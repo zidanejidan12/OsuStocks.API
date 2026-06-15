@@ -20,6 +20,8 @@ public sealed class ListTrackedPlayersQueryHandler(ITrackedPlayerRepository trac
                 player.Username,
                 player.TrackingTier.ToString(),
                 player.IsActive,
+                player.AvatarUrl,
+                player.Stock?.Id,
                 player.CreatedAt,
                 player.UpdatedAt))
             .ToList();

@@ -7,4 +7,6 @@ public sealed record AddTrackedPlayerResponse(
     long OsuUserId,
     string Username,
     TrackingTier TrackingTier,
-    bool IsActive);
+    bool IsActive,
+    string? AvatarUrl,
+    Guid StockId);

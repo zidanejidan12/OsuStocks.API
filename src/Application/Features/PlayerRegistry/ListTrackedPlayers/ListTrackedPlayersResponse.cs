@@ -9,5 +9,7 @@ public sealed record TrackedPlayerListItemResponse(
     string Username,
     string TrackingTier,
     bool IsActive,
+    string? AvatarUrl,
+    Guid? StockId,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt);

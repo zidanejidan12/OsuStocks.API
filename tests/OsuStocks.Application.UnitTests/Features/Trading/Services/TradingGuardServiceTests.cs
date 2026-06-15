@@ -299,6 +299,9 @@ public sealed class TradingGuardServiceTests
             var count = _trades.Count(x => x.UserId == userId && x.ExecutedAt >= since);
             return Task.FromResult(count);
         }
+
+        public Task<bool> ExistsByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_trades.Any(x => x.StockId == stockId));
     }
 
     private sealed class InMemoryHoldingRepo : IHoldingRepository
