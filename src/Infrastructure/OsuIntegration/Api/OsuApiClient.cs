@@ -12,7 +12,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         string accessToken,
         CancellationToken cancellationToken = default)
     {
-        return GetUserInternalAsync("me", accessToken, includeTopScore: true, cancellationToken);
+        // Always the osu! standard ruleset — otherwise the user's default mode (taiko/fruits/mania)
+        // is returned and we'd track the wrong pp/rank for players who default to another mode.
+        return GetUserInternalAsync("me/osu", accessToken, includeTopScore: true, cancellationToken);
     }
 
     public Task<OsuUserProfile> GetUserAsync(
@@ -21,7 +23,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         bool includeTopScore = true,
         CancellationToken cancellationToken = default)
     {
-        return GetUserInternalAsync($"users/{osuUserId}", accessToken, includeTopScore, cancellationToken);
+        // Pin to the osu! standard ruleset (see GetCurrentUserAsync) so a player's default mode
+        // never skews their tracked pp/rank.
+        return GetUserInternalAsync($"users/{osuUserId}/osu", accessToken, includeTopScore, cancellationToken);
     }
 
     public async Task<OsuTopScore?> GetTopScoreAsync(
@@ -31,7 +35,40 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
     {
         var topScore = await GetTopScoreInternalAsync(osuUserId, accessToken, cancellationToken);
 
-        return topScore is null ? null : new OsuTopScore(topScore.Id, topScore.Pp);
+        return topScore is null
+            ? null
+            : new OsuTopScore(
+                topScore.Id,
+                topScore.Pp,
+                topScore.Beatmapset?.Covers?.Cover2x ?? topScore.Beatmapset?.Covers?.Cover,
+                topScore.Beatmapset?.Title);
+    }
+
+    public async Task<IReadOnlyList<OsuTopScore>> GetTopScoresAsync(
+        long osuUserId,
+        string accessToken,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var boundedLimit = Math.Clamp(limit, 1, 100);
+        var scores = await SendAsync<List<OsuTopScoreResponse>>(
+            $"users/{osuUserId}/scores/best?mode=osu&limit={boundedLimit}",
+            accessToken,
+            cancellationToken);
+
+        if (scores is null)
+        {
+            return [];
+        }
+
+        return scores
+            .Select(static score => new OsuTopScore(
+                score.Id,
+                score.Pp,
+                score.Beatmapset?.Covers?.Cover2x ?? score.Beatmapset?.Covers?.Cover,
+                score.Beatmapset?.Title,
+                score.CreatedAt))
+            .ToList();
     }
 
     public async Task<IReadOnlyList<OsuUserProfile>> SearchUsersAsync(
@@ -84,7 +121,9 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
             user.Statistics?.GlobalRank,
             topScore?.Id,
             topScore?.Pp,
-            user.CountryCode);
+            user.CountryCode,
+            topScore?.Beatmapset?.Covers?.Cover2x ?? topScore?.Beatmapset?.Covers?.Cover,
+            topScore?.Beatmapset?.Title);
     }
 
     private async Task<OsuTopScoreResponse?> GetTopScoreInternalAsync(
@@ -160,5 +199,29 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
 
         [JsonPropertyName("pp")]
         public decimal? Pp { get; init; }
+
+        [JsonPropertyName("created_at")]
+        public DateTimeOffset? CreatedAt { get; init; }
+
+        [JsonPropertyName("beatmapset")]
+        public OsuBeatmapsetResponse? Beatmapset { get; init; }
+    }
+
+    private sealed class OsuBeatmapsetResponse
+    {
+        [JsonPropertyName("title")]
+        public string? Title { get; init; }
+
+        [JsonPropertyName("covers")]
+        public OsuBeatmapCoversResponse? Covers { get; init; }
+    }
+
+    private sealed class OsuBeatmapCoversResponse
+    {
+        [JsonPropertyName("cover@2x")]
+        public string? Cover2x { get; init; }
+
+        [JsonPropertyName("cover")]
+        public string? Cover { get; init; }
     }
 }

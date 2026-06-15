@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Models.Market;
@@ -43,6 +44,96 @@ internal sealed class MarketActivityReadRepository(AppDbContext dbContext) : IMa
             .ToListAsync(cancellationToken);
 
         return rows.Select(ToReadModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<StockTopPlayReadModel>> GetTopPlaysByStockAsync(
+        Guid stockId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        // Recent top-play events carry the score id + pp in their JSON payload. The matching price
+        // impact lives in stock_price_history (Reason = TopPlay); both rows are written with the same
+        // sync-cycle timestamp, so they correlate exactly on (stock_id, created_at).
+        var events = await dbContext.MarketEvents
+            .AsNoTracking()
+            .Where(e => e.StockId == stockId && e.EventType == "TopPlayDetected")
+            .OrderByDescending(e => e.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .Select(e => new { e.StockId, e.CreatedAt, e.Payload })
+            .ToListAsync(cancellationToken);
+
+        if (events.Count == 0)
+        {
+            return [];
+        }
+
+        var timestamps = events.Select(e => e.CreatedAt).Distinct().ToList();
+        var priceRows = await dbContext.StockPriceHistory
+            .AsNoTracking()
+            .Where(h => h.StockId == stockId
+                && h.Reason == PriceChangeReason.TopPlay
+                && timestamps.Contains(h.CreatedAt))
+            .Select(h => new { h.CreatedAt, h.PreviousPrice, h.NewPrice })
+            .ToListAsync(cancellationToken);
+
+        var priceByTime = priceRows
+            .GroupBy(p => p.CreatedAt)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var result = new List<StockTopPlayReadModel>(events.Count);
+        foreach (var marketEvent in events)
+        {
+            var payload = ParseTopPlayPayload(marketEvent.Payload);
+
+            decimal? percentChange = null;
+            decimal? newPrice = null;
+            if (priceByTime.TryGetValue(marketEvent.CreatedAt, out var price))
+            {
+                newPrice = price.NewPrice;
+                percentChange = price.PreviousPrice == 0m
+                    ? 0m
+                    : Math.Round(((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100m, 2);
+            }
+
+            result.Add(new StockTopPlayReadModel(
+                marketEvent.StockId,
+                payload?.NewTopScoreId ?? 0,
+                payload?.NewTopScorePp,
+                payload?.CoverUrl,
+                payload?.Title,
+                percentChange,
+                newPrice,
+                marketEvent.CreatedAt));
+        }
+
+        return result;
+    }
+
+    private static TopPlayPayload? ParseTopPlayPayload(string payload)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<TopPlayPayload>(payload, TopPlayPayloadOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static readonly JsonSerializerOptions TopPlayPayloadOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private sealed record TopPlayPayload
+    {
+        public long NewTopScoreId { get; init; }
+        public decimal? NewTopScorePp { get; init; }
+        public string? CoverUrl { get; init; }
+        public string? Title { get; init; }
     }
 
     // Projects only SQL-translatable pieces: the player join and the raw history columns.

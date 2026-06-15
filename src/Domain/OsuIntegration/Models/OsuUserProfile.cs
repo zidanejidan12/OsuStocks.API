@@ -8,4 +8,6 @@ public sealed record OsuUserProfile(
     int? GlobalRank,
     long? TopScoreId,
     decimal? TopScorePp,
-    string? CountryCode = null);
+    string? CountryCode = null,
+    string? TopScoreCoverUrl = null,
+    string? TopScoreTitle = null);

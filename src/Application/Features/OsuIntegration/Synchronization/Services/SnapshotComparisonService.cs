@@ -37,7 +37,9 @@ public sealed class SnapshotComparisonService : ISnapshotComparisonService
                 previousSnapshot.TopScoreId,
                 currentProfile.TopScoreId.Value,
                 currentProfile.TopScorePp,
-                now));
+                now,
+                currentProfile.TopScoreCoverUrl,
+                currentProfile.TopScoreTitle));
         }
 
         var isRankImproved = previousSnapshot.GlobalRank.HasValue
