@@ -12,4 +12,7 @@ public interface IPlayerSnapshotRepository
     Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestByTrackedPlayerIdsAsync(
         IReadOnlyCollection<Guid> trackedPlayerIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Bulk-deletes snapshots captured before <paramref name="cutoff"/>. Returns rows removed.</summary>
+    Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default);
 }

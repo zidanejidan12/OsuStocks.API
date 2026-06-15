@@ -291,6 +291,17 @@ public sealed class SynchronizationWorkerIntegrationTests
             return Task.FromResult<IReadOnlyDictionary<Guid, PlayerSnapshot>>(result);
         }
 
+        public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+        {
+            var removed = 0;
+            foreach (var list in _snapshotsByTrackedPlayerId.Values)
+            {
+                removed += list.RemoveAll(x => x.CapturedAt < cutoff);
+            }
+
+            return Task.FromResult(removed);
+        }
+
         private static PlayerSnapshot Clone(PlayerSnapshot snapshot)
         {
             return new PlayerSnapshot
