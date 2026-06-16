@@ -85,6 +85,7 @@ public sealed class MarketEventProcessingService(
             MarketInputType.SellOrderExecuted => PriceChangeReason.SellPressure,
             MarketInputType.TopPlayDetected => PriceChangeReason.TopPlay,
             MarketInputType.PpIncreased => PriceChangeReason.PPGain,
+            MarketInputType.RankChanged => PriceChangeReason.RankChange,
             MarketInputType.PlayerInactive => PriceChangeReason.Decay,
             _ => PriceChangeReason.AdminAdjustment
         };

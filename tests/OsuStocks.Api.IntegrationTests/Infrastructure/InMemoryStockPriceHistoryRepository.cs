@@ -34,6 +34,22 @@ internal sealed class InMemoryStockPriceHistoryRepository : IStockPriceHistoryRe
         return Task.FromResult<IReadOnlyList<StockPriceHistory>>(items);
     }
 
+    public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+    {
+        var removed = 0;
+        foreach (var stockId in _itemsByStock.Keys.ToList())
+        {
+            if (_itemsByStock.TryGetValue(stockId, out var queue))
+            {
+                var kept = queue.Where(x => x.CreatedAt >= cutoff).ToList();
+                removed += queue.Count - kept.Count;
+                _itemsByStock[stockId] = new ConcurrentQueue<StockPriceHistory>(kept);
+            }
+        }
+
+        return Task.FromResult(removed);
+    }
+
     public IReadOnlyList<StockPriceHistory> GetAllForStock(Guid stockId)
     {
         if (!_itemsByStock.TryGetValue(stockId, out var queue))

@@ -23,4 +23,13 @@ internal sealed class StockPriceHistoryRepository(AppDbContext dbContext) : ISto
             .Take(take)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+    {
+        // Set-based delete. Current price lives on the stock; rows beyond the retention window are
+        // only kept for charts/history, so older rows are safe to drop to bound table growth.
+        return dbContext.StockPriceHistory
+            .Where(x => x.CreatedAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 }

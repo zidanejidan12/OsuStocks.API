@@ -78,31 +78,57 @@ internal sealed class MarketActivityReadRepository(AppDbContext dbContext) : IMa
             .Select(h => new { h.CreatedAt, h.PreviousPrice, h.NewPrice })
             .ToListAsync(cancellationToken);
 
-        var priceByTime = priceRows
+        // Multiple plays can share one sync-cycle timestamp, so a timestamp maps to several price
+        // rows. Parse payloads up front, then pair each play to its OWN row: within a timestamp, the
+        // k-th play by pp <-> the k-th row by chain order (PreviousPrice asc). Impacts compound
+        // multiplicatively (order-invariant), so this pairing is purely cosmetic but ensures each
+        // play shows its own impact instead of all sharing one row's value.
+        var priceRowsByTime = priceRows
             .GroupBy(p => p.CreatedAt)
-            .ToDictionary(g => g.Key, g => g.First());
+            .ToDictionary(g => g.Key, g => g.OrderBy(p => p.PreviousPrice).ToList());
 
-        var result = new List<StockTopPlayReadModel>(events.Count);
-        foreach (var marketEvent in events)
+        var parsed = events
+            .Select(e => new { e.StockId, e.CreatedAt, Payload = ParseTopPlayPayload(e.Payload) })
+            .ToList();
+
+        var priceByEvent = new Dictionary<int, (decimal Prev, decimal New)>();
+        foreach (var group in parsed
+            .Select((e, index) => (e, index))
+            .GroupBy(x => x.e.CreatedAt))
         {
-            var payload = ParseTopPlayPayload(marketEvent.Payload);
+            if (!priceRowsByTime.TryGetValue(group.Key, out var rows))
+            {
+                continue;
+            }
+
+            var playsByPp = group.OrderBy(x => x.e.Payload?.NewTopScorePp ?? 0m).ToList();
+            for (var i = 0; i < playsByPp.Count && i < rows.Count; i++)
+            {
+                priceByEvent[playsByPp[i].index] = (rows[i].PreviousPrice, rows[i].NewPrice);
+            }
+        }
+
+        var result = new List<StockTopPlayReadModel>(parsed.Count);
+        for (var index = 0; index < parsed.Count; index++)
+        {
+            var marketEvent = parsed[index];
 
             decimal? percentChange = null;
             decimal? newPrice = null;
-            if (priceByTime.TryGetValue(marketEvent.CreatedAt, out var price))
+            if (priceByEvent.TryGetValue(index, out var price))
             {
-                newPrice = price.NewPrice;
-                percentChange = price.PreviousPrice == 0m
+                newPrice = price.New;
+                percentChange = price.Prev == 0m
                     ? 0m
-                    : Math.Round(((price.NewPrice - price.PreviousPrice) / price.PreviousPrice) * 100m, 2);
+                    : Math.Round(((price.New - price.Prev) / price.Prev) * 100m, 2);
             }
 
             result.Add(new StockTopPlayReadModel(
                 marketEvent.StockId,
-                payload?.NewTopScoreId ?? 0,
-                payload?.NewTopScorePp,
-                payload?.CoverUrl,
-                payload?.Title,
+                marketEvent.Payload?.NewTopScoreId ?? 0,
+                marketEvent.Payload?.NewTopScorePp,
+                marketEvent.Payload?.CoverUrl,
+                marketEvent.Payload?.Title,
                 percentChange,
                 newPrice,
                 marketEvent.CreatedAt));
