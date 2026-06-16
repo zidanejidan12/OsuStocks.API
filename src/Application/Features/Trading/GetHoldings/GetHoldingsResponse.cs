@@ -6,7 +6,7 @@ public sealed record HoldingItemResponse(
     Guid HoldingId,
     Guid StockId,
     string? PlayerName,
-    int Quantity,
+    decimal Quantity,
     decimal AveragePrice,
     decimal CurrentPrice,
     string? AvatarUrl = null);

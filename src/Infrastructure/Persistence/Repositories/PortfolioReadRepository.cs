@@ -10,10 +10,12 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.Holdings
+        // Sort client-side after a single SELECT: a user's holdings are few, and ordering by the
+        // decimal Quantity in SQL isn't supported by the SQLite provider used in query-count tests
+        // (Postgres handles it fine either way).
+        var holdings = await dbContext.Holdings
             .AsNoTracking()
             .Where(x => x.Portfolio.UserId == userId)
-            .OrderByDescending(x => x.Quantity)
             .Select(x => new PortfolioHoldingSummaryReadModel(
                 x.Id,
                 x.StockId,
@@ -26,16 +28,17 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
                 (x.Stock.CurrentPrice * x.Quantity) - (x.AveragePrice * x.Quantity),
                 x.Stock.TrackedPlayer.AvatarUrl))
             .ToListAsync(cancellationToken);
+
+        return holdings.OrderByDescending(x => x.Quantity).ToList();
     }
 
     public async Task<IReadOnlyList<HoldingReadModel>> GetHoldingsByUserIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.Holdings
+        var holdings = await dbContext.Holdings
             .AsNoTracking()
             .Where(x => x.Portfolio.UserId == userId)
-            .OrderByDescending(x => x.Quantity)
             .Select(x => new HoldingReadModel(
                 x.Id,
                 x.StockId,
@@ -45,5 +48,7 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
                 x.Stock.CurrentPrice,
                 x.Stock.TrackedPlayer.AvatarUrl))
             .ToListAsync(cancellationToken);
+
+        return holdings.OrderByDescending(x => x.Quantity).ToList();
     }
 }

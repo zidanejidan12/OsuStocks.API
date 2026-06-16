@@ -280,7 +280,7 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
     private sealed record HoldingsEnvelope([property: JsonPropertyName("items")] List<HoldingItem> Items);
 
     private sealed record HoldingItem(
-        [property: JsonPropertyName("quantity")] int Quantity,
+        [property: JsonPropertyName("quantity")] decimal Quantity,
         [property: JsonPropertyName("averagePrice")] decimal AveragePrice);
 
     private sealed record HistoryEnvelope([property: JsonPropertyName("items")] List<HistoryItem> Items);

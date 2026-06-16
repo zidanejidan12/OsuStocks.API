@@ -95,4 +95,4 @@ internal static class TradingEndpoints
     }
 }
 
-public sealed record TradeStockRequest(Guid StockId, int Quantity);
+public sealed record TradeStockRequest(Guid StockId, decimal Quantity);

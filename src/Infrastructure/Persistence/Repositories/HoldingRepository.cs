@@ -32,7 +32,7 @@ internal sealed class HoldingRepository(AppDbContext dbContext) : IHoldingReposi
             .ToListAsync(cancellationToken);
     }
 
-    public Task<int> GetTotalQuantityByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
+    public Task<decimal> GetTotalQuantityByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
     {
         return dbContext.Holdings
             .AsNoTracking()

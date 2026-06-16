@@ -15,7 +15,7 @@ internal sealed class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(x => x.StockId).HasColumnName("stock_id").IsRequired();
         builder.Property(x => x.TradeType).HasColumnName("trade_type").HasConversion<string>().HasMaxLength(16).IsRequired();
-        builder.Property(x => x.Quantity).HasColumnName("quantity").IsRequired();
+        builder.Property(x => x.Quantity).HasColumnName("quantity").HasColumnType("numeric(18,2)").IsRequired();
         builder.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(18, 2).IsRequired();
         builder.Property(x => x.TotalAmount).HasColumnName("total_amount").HasPrecision(18, 2).IsRequired();
         builder.Property(x => x.ExecutedAt).HasColumnName("executed_at").IsRequired();

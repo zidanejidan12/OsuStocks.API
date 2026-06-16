@@ -6,7 +6,7 @@ public sealed record TradeHistoryReadModel(
     Guid TradeId,
     Guid StockId,
     TradeType TradeType,
-    int Quantity,
+    decimal Quantity,
     decimal UnitPrice,
     decimal TotalAmount,
     DateTimeOffset ExecutedAt,

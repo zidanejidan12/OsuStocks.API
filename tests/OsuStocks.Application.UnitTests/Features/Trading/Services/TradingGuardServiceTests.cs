@@ -317,7 +317,7 @@ public sealed class TradingGuardServiceTests
         public Task<IReadOnlyList<Holding>> GetByPortfolioIdAsync(Guid portfolioId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<Holding>>([]);
 
-        public Task<int> GetTotalQuantityByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
+        public Task<decimal> GetTotalQuantityByStockAsync(Guid stockId, CancellationToken cancellationToken = default)
         {
             var total = _holdings.Where(x => x.StockId == stockId).Sum(x => x.Quantity);
             return Task.FromResult(total);

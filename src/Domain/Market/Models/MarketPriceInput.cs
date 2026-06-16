@@ -2,15 +2,15 @@ namespace OsuStocks.Domain.Market.Models;
 
 public sealed record MarketPriceInput(
     MarketInputType Type,
-    int Quantity = 0,
+    decimal Quantity = 0m,
     decimal PreviousPp = 0m,
     decimal CurrentPp = 0m,
     decimal TopPlayPp = 0m,
     int PreviousRank = 0,
     int CurrentRank = 0)
 {
-    public static MarketPriceInput Buy(int quantity) => new(MarketInputType.BuyOrderExecuted, quantity);
-    public static MarketPriceInput Sell(int quantity) => new(MarketInputType.SellOrderExecuted, quantity);
+    public static MarketPriceInput Buy(decimal quantity) => new(MarketInputType.BuyOrderExecuted, quantity);
+    public static MarketPriceInput Sell(decimal quantity) => new(MarketInputType.SellOrderExecuted, quantity);
 
     // CurrentPp carries the player's overall pp; TopPlayPp the pp of the newly-set play. The engine
     // scales the price bump by playPp / playerPp so breakout plays move the stock more than the same

@@ -253,7 +253,7 @@ public sealed class ProjectedReadModelsQueryCountTests(PostgresTestcontainerFixt
         [property: JsonPropertyName("holdingId")] Guid HoldingId,
         [property: JsonPropertyName("stockId")] Guid StockId,
         [property: JsonPropertyName("playerName")] string? PlayerName,
-        [property: JsonPropertyName("quantity")] int Quantity,
+        [property: JsonPropertyName("quantity")] decimal Quantity,
         [property: JsonPropertyName("averagePrice")] decimal AveragePrice,
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,
         [property: JsonPropertyName("costBasis")] decimal CostBasis,
@@ -266,7 +266,7 @@ public sealed class ProjectedReadModelsQueryCountTests(PostgresTestcontainerFixt
         [property: JsonPropertyName("holdingId")] Guid HoldingId,
         [property: JsonPropertyName("stockId")] Guid StockId,
         [property: JsonPropertyName("playerName")] string? PlayerName,
-        [property: JsonPropertyName("quantity")] int Quantity,
+        [property: JsonPropertyName("quantity")] decimal Quantity,
         [property: JsonPropertyName("averagePrice")] decimal AveragePrice,
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice);
 
@@ -276,7 +276,7 @@ public sealed class ProjectedReadModelsQueryCountTests(PostgresTestcontainerFixt
         [property: JsonPropertyName("tradeId")] Guid TradeId,
         [property: JsonPropertyName("stockId")] Guid StockId,
         [property: JsonPropertyName("tradeType")] string TradeType,
-        [property: JsonPropertyName("quantity")] int Quantity,
+        [property: JsonPropertyName("quantity")] decimal Quantity,
         [property: JsonPropertyName("unitPrice")] decimal UnitPrice,
         [property: JsonPropertyName("totalAmount")] decimal TotalAmount,
         [property: JsonPropertyName("executedAt")] DateTimeOffset ExecutedAt,
