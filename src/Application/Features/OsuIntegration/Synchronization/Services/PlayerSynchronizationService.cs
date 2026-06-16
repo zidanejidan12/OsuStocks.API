@@ -220,6 +220,9 @@ public sealed class PlayerSynchronizationService(
                                 case PpIncreased ppIncreased:
                                     await publisher.Publish(new PpIncreasedNotification(ppIncreased), cancellationToken);
                                     break;
+                                case RankChanged rankChanged:
+                                    await publisher.Publish(new RankChangedNotification(rankChanged), cancellationToken);
+                                    break;
                                 case TopPlayDetected topPlayDetected:
                                     await publisher.Publish(new TopPlayDetectedNotification(topPlayDetected), cancellationToken);
                                     break;

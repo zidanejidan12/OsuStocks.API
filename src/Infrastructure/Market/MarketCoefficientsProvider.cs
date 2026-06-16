@@ -28,6 +28,8 @@ internal sealed class MarketCoefficientsProvider(
             value.PpImpactPerPoint * ppMultiplier,
             value.MaxPpImpact * ppMultiplier,
             value.InactivityDecayImpact * decayMultiplier,
-            value.PriceFloor <= 0m ? 1m : value.PriceFloor);
+            value.PriceFloor <= 0m ? 1m : value.PriceFloor,
+            value.RankChangeImpactScale * ppMultiplier,
+            value.MaxRankChangeImpact * ppMultiplier);
     }
 }
