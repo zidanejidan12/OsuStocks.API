@@ -23,4 +23,13 @@ internal sealed class MarketEventRepository(AppDbContext dbContext) : IMarketEve
             .Take(take)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+    {
+        // Set-based delete to bound table growth. Market events older than the retention window are
+        // only used for the activity feed / recent top plays, so they're safe to drop.
+        return dbContext.MarketEvents
+            .Where(x => x.CreatedAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 }

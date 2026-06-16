@@ -6,7 +6,7 @@ namespace OsuStocks.Api.IntegrationTests.Infrastructure;
 
 internal sealed class InMemoryMarketEventRepository : IMarketEventRepository
 {
-    private readonly ConcurrentBag<MarketEvent> _events = [];
+    private ConcurrentBag<MarketEvent> _events = [];
 
     public Task AddAsync(MarketEvent marketEvent, CancellationToken cancellationToken = default)
     {
@@ -27,6 +27,14 @@ internal sealed class InMemoryMarketEventRepository : IMarketEventRepository
             .ToList();
 
         return Task.FromResult<IReadOnlyList<MarketEvent>>(items);
+    }
+
+    public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+    {
+        var all = _events.ToList();
+        var kept = all.Where(x => x.CreatedAt >= cutoff).ToList();
+        _events = new ConcurrentBag<MarketEvent>(kept);
+        return Task.FromResult(all.Count - kept.Count);
     }
 
     public IReadOnlyList<MarketEvent> GetAll()

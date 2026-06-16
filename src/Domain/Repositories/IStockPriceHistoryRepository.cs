@@ -9,4 +9,5 @@ public interface IStockPriceHistoryRepository
         Guid stockId,
         int take,
         CancellationToken cancellationToken = default);
+    Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default);
 }
