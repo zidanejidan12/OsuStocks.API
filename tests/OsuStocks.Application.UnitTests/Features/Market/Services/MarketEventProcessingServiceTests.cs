@@ -29,7 +29,9 @@ public sealed class MarketEventProcessingServiceTests
         var coefficientsProvider = new StaticMarketCoefficientsProvider(new MarketPricingCoefficients(
             0.01m,
             0.01m,
-            0.05m,
+            0.6m,
+            0.10m,
+            0.005m,
             0.001m,
             0.10m,
             0.005m,
@@ -80,7 +82,9 @@ public sealed class MarketEventProcessingServiceTests
         var coefficientsProvider = new StaticMarketCoefficientsProvider(new MarketPricingCoefficients(
             0.01m,
             0.01m,
-            0.03m,
+            0.6m,
+            0.10m,
+            0.005m,
             0.001m,
             0.10m,
             0.50m,

@@ -22,7 +22,9 @@ internal sealed class MarketCoefficientsProvider(
         return new MarketPricingCoefficients(
             value.TradeBuyImpactPerShare * tradeMultiplier,
             value.TradeSellImpactPerShare * tradeMultiplier,
-            value.TopPlayImpact * ppMultiplier,
+            value.TopPlayImpactScale * ppMultiplier,
+            value.MaxTopPlayImpact * ppMultiplier,
+            value.MinTopPlayImpact * ppMultiplier,
             value.PpImpactPerPoint * ppMultiplier,
             value.MaxPpImpact * ppMultiplier,
             value.InactivityDecayImpact * decayMultiplier,

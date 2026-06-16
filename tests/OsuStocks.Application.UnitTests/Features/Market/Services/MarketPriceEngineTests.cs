@@ -11,7 +11,9 @@ public sealed class MarketPriceEngineTests
     private static readonly MarketPricingCoefficients Coefficients = new(
         TradeBuyImpactPerShare: 0.01m,
         TradeSellImpactPerShare: 0.02m,
-        TopPlayImpact: 0.05m,
+        TopPlayImpactScale: 0.6m,
+        MaxTopPlayImpact: 0.10m,
+        MinTopPlayImpact: 0.005m,
         PpImpactPerPoint: 0.001m,
         MaxPpImpact: 0.10m,
         InactivityDecayImpact: 0.50m,
@@ -34,6 +36,34 @@ public sealed class MarketPriceEngineTests
 
         Assert.Equal(110m, result.NewPrice);
         Assert.Equal(0.10m, result.PercentageChange);
+    }
+
+    [Fact]
+    public void Calculate_TopPlay_ScalesWithPlayPpRelativeToPlayerPp()
+    {
+        // ratio = 1000/10000 = 0.1; impact = 0.6 * 0.1 = 0.06 (within [min, max]).
+        var result = _engine.Calculate(100m, MarketPriceInput.TopPlay(playPp: 1000m, playerPp: 10000m), Coefficients);
+
+        Assert.Equal(0.06m, result.PercentageChange);
+        Assert.Equal(106m, result.NewPrice);
+    }
+
+    [Fact]
+    public void Calculate_TopPlay_BreakoutPlayIsCappedAtMax()
+    {
+        // ratio = 700/5000 = 0.14; impact = 0.6 * 0.14 = 0.084 -> capped at MaxTopPlayImpact 0.10? No: 0.084 < 0.10.
+        // Use a larger fraction to exceed the cap: 800/3000 = 0.266 -> 0.6*0.266 = 0.16 -> clamped to 0.10.
+        var result = _engine.Calculate(100m, MarketPriceInput.TopPlay(playPp: 800m, playerPp: 3000m), Coefficients);
+
+        Assert.Equal(0.10m, result.PercentageChange);
+    }
+
+    [Fact]
+    public void Calculate_TopPlay_FallsBackToFloorWhenPpUnknown()
+    {
+        var result = _engine.Calculate(100m, MarketPriceInput.TopPlay(playPp: 0m, playerPp: 0m), Coefficients);
+
+        Assert.Equal(0.005m, result.PercentageChange);
     }
 
     [Fact]
