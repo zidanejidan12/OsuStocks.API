@@ -209,6 +209,12 @@ public sealed class MarketEventProcessingServiceTests
 
             return Task.FromResult<IReadOnlyList<StockPriceHistory>>(items);
         }
+
+        public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+        {
+            var removed = _items.RemoveAll(x => x.CreatedAt < cutoff);
+            return Task.FromResult(removed);
+        }
     }
 }
 

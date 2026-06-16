@@ -403,6 +403,12 @@ public sealed class SynchronizationWorkerIntegrationTests
             return Task.FromResult<IReadOnlyList<MarketEvent>>(items);
         }
 
+        public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+        {
+            var removed = _events.RemoveAll(x => x.CreatedAt < cutoff);
+            return Task.FromResult(removed);
+        }
+
         private static MarketEvent Clone(MarketEvent marketEvent)
         {
             return new MarketEvent
