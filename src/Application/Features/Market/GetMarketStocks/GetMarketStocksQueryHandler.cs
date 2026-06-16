@@ -22,7 +22,9 @@ public sealed class GetMarketStocksQueryHandler(
         // Normalize sort/search so equivalent queries share a cache entry (matches repo behavior).
         var sortKey = string.IsNullOrWhiteSpace(request.Sort) ? "default" : request.Sort.Trim().ToLowerInvariant();
         var searchKey = string.IsNullOrWhiteSpace(request.Search) ? string.Empty : request.Search.Trim().ToLowerInvariant();
-        var cacheKey = $"market-stocks:p{request.Page}:s{request.PageSize}:sort{sortKey}:q{searchKey}";
+        var country = NormalizeCountry(request.Country);
+        var countryKey = country ?? "all";
+        var cacheKey = $"market-stocks:p{request.Page}:s{request.PageSize}:sort{sortKey}:q{searchKey}:c{countryKey}";
 
         var response = await readModelCache.GetOrSetAsync(
             cacheKey,
@@ -30,7 +32,7 @@ public sealed class GetMarketStocksQueryHandler(
             async ct =>
             {
                 var result = await marketReadRepository.GetStocksAsync(
-                    new MarketStocksQuerySpec(request.Page, request.PageSize, request.Sort, request.Search),
+                    new MarketStocksQuerySpec(request.Page, request.PageSize, request.Sort, request.Search, country),
                     ct);
 
                 return new GetMarketStocksResponse(
@@ -49,5 +51,18 @@ public sealed class GetMarketStocksQueryHandler(
             cancellationToken);
 
         return Result.Success(response);
+    }
+
+    // Trim + uppercase so equivalent country filters share a cache entry and the repo gets a canonical
+    // ISO code. Null/empty/"ALL" mean "no country filter".
+    private static string? NormalizeCountry(string? country)
+    {
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return null;
+        }
+
+        var normalized = country.Trim().ToUpperInvariant();
+        return normalized == "ALL" ? null : normalized;
     }
 }

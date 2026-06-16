@@ -4,4 +4,5 @@ public sealed record MarketStocksQuerySpec(
     int Page,
     int PageSize,
     string? Sort,
-    string? Search);
+    string? Search,
+    string? Country);

@@ -1,6 +1,7 @@
 using MediatR;
 using OsuStocks.Api.Common;
 using OsuStocks.Application.Features.Market.GetLiveMovers;
+using OsuStocks.Application.Features.Market.GetMarketCountries;
 using OsuStocks.Application.Features.Market.GetMarketOverview;
 using OsuStocks.Application.Features.Market.GetMarketStockDetails;
 using OsuStocks.Application.Features.Market.GetMarketStockHistory;
@@ -89,6 +90,7 @@ internal static class MarketEndpoints
             int? pageSize,
             string? sort,
             string? search,
+            string? country,
             ISender sender,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
@@ -97,7 +99,8 @@ internal static class MarketEndpoints
                 page ?? 1,
                 pageSize ?? 25,
                 sort,
-                search), cancellationToken);
+                search,
+                country), cancellationToken);
 
             if (!result.IsSuccess || result.Value is null)
             {
@@ -110,6 +113,27 @@ internal static class MarketEndpoints
                 page = result.Value.Page,
                 pageSize = result.Value.PageSize,
                 totalCount = result.Value.TotalCount
+            });
+        });
+
+        marketGroup.MapGet("/countries", async (
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(new GetMarketCountriesQuery(), cancellationToken);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.Ok(new
+            {
+                items = result.Value.Items.Select(x => new
+                {
+                    countryCode = x.CountryCode,
+                    count = x.Count
+                })
             });
         });
 
