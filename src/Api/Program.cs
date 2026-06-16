@@ -188,6 +188,7 @@ app.MapInvestorEndpoints();
 app.MapAchievementEndpoints();
 app.MapMissionEndpoints();
 app.MapAdminEndpoints();
+app.MapDailyLoginEndpoints();
 
 var hangfireDashboardAuthorizationFilter = app.Services.GetRequiredService<IDashboardAuthorizationFilter>();
 

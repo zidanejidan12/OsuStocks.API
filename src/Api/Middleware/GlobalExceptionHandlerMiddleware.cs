@@ -26,6 +26,24 @@ internal sealed class GlobalExceptionHandlerMiddleware(
                 traceId = httpContext.TraceIdentifier
             });
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
+            when (ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+        {
+            // Generic backstop: a unique-constraint violation that escaped a handler means the request
+            // conflicts with existing state. (The daily-reward flow translates its own duplicate to an
+            // idempotent success and never reaches here.)
+            logger.LogWarning(ex,
+                "Unique constraint violation for TraceId {TraceId}",
+                httpContext.TraceIdentifier);
+
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            await httpContext.Response.WriteAsJsonAsync(new
+            {
+                code = "CONFLICT",
+                message = "The request conflicts with the current state of the resource.",
+                traceId = httpContext.TraceIdentifier
+            });
+        }
         catch (Exception ex)
         {
             logger.LogError(ex,

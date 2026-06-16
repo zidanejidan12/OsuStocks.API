@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OsuStocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using OsuStocks.Infrastructure.Persistence;
 namespace OsuStocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260609165121_AddDailyLoginRewards")]
+    partial class AddDailyLoginRewards
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -118,63 +121,6 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("uq_holding_portfolio_stock");
 
                     b.ToTable("holdings", (string)null);
-                });
-
-            modelBuilder.Entity("OsuStocks.Domain.Entities.InvestorProfile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("created_by");
-
-                    b.Property<DateTimeOffset?>("LastLevelUpAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_level_up_at");
-
-                    b.Property<int>("Level")
-                        .HasColumnType("integer")
-                        .HasColumnName("level");
-
-                    b.Property<long>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasDefaultValue(1L)
-                        .HasColumnName("row_version");
-
-                    b.Property<long>("TotalXp")
-                        .HasColumnType("bigint")
-                        .HasColumnName("total_xp");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("updated_by");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_investor_profile_user_id");
-
-                    b.ToTable("investor_profiles", (string)null);
                 });
 
             modelBuilder.Entity("OsuStocks.Domain.Entities.MarketEvent", b =>
@@ -703,80 +649,6 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("OsuStocks.Domain.Entities.UserAchievement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AchievementCode")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("achievement_code");
-
-                    b.Property<long>("RewardCredits")
-                        .HasColumnType("bigint")
-                        .HasColumnName("reward_credits");
-
-                    b.Property<DateTimeOffset>("UnlockedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("unlocked_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "AchievementCode")
-                        .IsUnique()
-                        .HasDatabaseName("uq_user_achievement_user_code");
-
-                    b.ToTable("user_achievements", (string)null);
-                });
-
-            modelBuilder.Entity("OsuStocks.Domain.Entities.UserMissionCompletion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<string>("MissionCode")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("mission_code");
-
-                    b.Property<string>("PeriodKey")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("period_key");
-
-                    b.Property<long>("RewardCredits")
-                        .HasColumnType("bigint")
-                        .HasColumnName("reward_credits");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "MissionCode", "PeriodKey")
-                        .IsUnique()
-                        .HasDatabaseName("uq_user_mission_completion_user_code_period");
-
-                    b.ToTable("user_mission_completions", (string)null);
-                });
-
             modelBuilder.Entity("OsuStocks.Domain.Entities.Wallet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -935,17 +807,6 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                     b.Navigation("Stock");
                 });
 
-            modelBuilder.Entity("OsuStocks.Domain.Entities.InvestorProfile", b =>
-                {
-                    b.HasOne("OsuStocks.Domain.Entities.User", "User")
-                        .WithOne()
-                        .HasForeignKey("OsuStocks.Domain.Entities.InvestorProfile", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("OsuStocks.Domain.Entities.MarketEvent", b =>
                 {
                     b.HasOne("OsuStocks.Domain.Entities.PlayerStock", "Stock")
@@ -1016,28 +877,6 @@ namespace OsuStocks.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Stock");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("OsuStocks.Domain.Entities.UserAchievement", b =>
-                {
-                    b.HasOne("OsuStocks.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("OsuStocks.Domain.Entities.UserMissionCompletion", b =>
-                {
-                    b.HasOne("OsuStocks.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });

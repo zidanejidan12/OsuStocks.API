@@ -16,6 +16,12 @@ public sealed class User
     public string? UpdatedBy { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    // Denormalized cache of the daily-login reward state. The DailyLoginReward ledger is the
+    // authoritative source; these fields are written in the same transaction as each grant for
+    // fast reads and must not be the sole basis of a grant decision.
+    public int DailyRewardStreak { get; set; }
+    public DateOnly? LastDailyRewardDate { get; set; }
+
     public Wallet? Wallet { get; set; }
     public Portfolio? Portfolio { get; set; }
     public ICollection<Trade> Trades { get; set; } = new List<Trade>();

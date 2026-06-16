@@ -17,6 +17,12 @@ internal sealed class WalletRepository(AppDbContext dbContext) : IWalletReposito
         return dbContext.Wallets.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
     }
 
+    public Task<Wallet?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Tracked (no AsNoTracking) so callers can mutate Balance and persist with RowVersion concurrency.
+        return dbContext.Wallets.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+    }
+
     public Task<WalletBalanceReadModel?> GetBalanceByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return dbContext.Wallets

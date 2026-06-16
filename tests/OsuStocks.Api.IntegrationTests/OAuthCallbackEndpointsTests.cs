@@ -65,13 +65,19 @@ public sealed class OAuthCallbackEndpointsTests
 
         Assert.NotNull(wallet);
         Assert.Equal(1, walletRepository.Count);
-        Assert.Equal(100_000m, wallet.Balance);
+        // New users get the 100k initial grant plus the auto-granted day-1 daily-login reward
+        // (default schedule day 1 = 5,000), since logging in is their first login of the day.
+        Assert.Equal(105_000m, wallet.Balance);
 
         var transactions = await walletTransactionRepository.GetByWalletIdAsync(wallet.Id, 0, 10);
 
-        Assert.Single(transactions);
-        Assert.Equal(WalletTransactionType.InitialGrant, transactions[0].TransactionType);
-        Assert.Equal(100_000m, transactions[0].Amount);
+        Assert.Equal(2, transactions.Count);
+        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.InitialGrant && t.Amount == 100_000m);
+        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.DailyReward && t.Amount == 5_000m);
+
+        // The daily-login cache on the user reflects the auto-grant.
+        Assert.Equal(1, user.DailyRewardStreak);
+        Assert.Equal(DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime), user.LastDailyRewardDate);
 
         var portfolio = await portfolioRepository.GetByUserIdAsync(user.Id);
 
@@ -134,6 +140,11 @@ public sealed class OAuthCallbackEndpointsTests
         Assert.Equal("https://avatar.example/mrekk", user.AvatarUrl);
         Assert.Equal(1, userRepository.Count);
 
+        // This seeded user has no wallet, so the best-effort daily-login auto-grant is a no-op (NOT_FOUND)
+        // and must not have mutated the streak cache.
+        Assert.Equal(0, user.DailyRewardStreak);
+        Assert.Null(user.LastDailyRewardDate);
+
         Assert.Equal(0, walletRepository.Count);
         Assert.Equal(0, walletTransactionRepository.Count);
         Assert.Equal(0, portfolioRepository.Count);
@@ -149,6 +160,60 @@ public sealed class OAuthCallbackEndpointsTests
         Assert.Equal("oauth-user-token", savedToken.AccessToken);
     }
 
+
+    [Fact]
+    public async Task Callback_ReturningUserWithWallet_AutoGrantsDailyReward()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var userRepository = scope.ServiceProvider.GetRequiredService<InMemoryUserRepository>();
+        var walletRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletRepository>();
+        var walletTransactionRepository = scope.ServiceProvider.GetRequiredService<InMemoryWalletTransactionRepository>();
+        var ledgerRepository = scope.ServiceProvider.GetRequiredService<InMemoryDailyLoginRewardRepository>();
+        var tokenManager = scope.ServiceProvider.GetRequiredService<IOsuTokenManager>();
+
+        var existingUserId = Guid.NewGuid();
+        await userRepository.AddAsync(new User
+        {
+            Id = existingUserId,
+            OsuUserId = 1001,
+            Username = "returning",
+            Role = UserRole.User,
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-5),
+            CreatedBy = "seed",
+            LastLoginAt = DateTimeOffset.UtcNow.AddDays(-2)
+        });
+        await walletRepository.AddAsync(new Wallet
+        {
+            Id = Guid.NewGuid(),
+            UserId = existingUserId,
+            Balance = 100_000m,
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-5),
+            CreatedBy = "seed"
+        });
+
+        const string state = "oauth-state-returning-grant";
+        await tokenManager.StoreAuthorizationStateAsync(state, null, TimeSpan.FromMinutes(5));
+
+        var response = await client.GetAsync($"/api/v1/auth/callback?code=valid-code&state={state}");
+        response.EnsureSuccessStatusCode();
+
+        var user = await userRepository.GetByOsuUserIdAsync(1001);
+        Assert.NotNull(user);
+        Assert.Equal(1, user!.DailyRewardStreak);
+        Assert.Equal(DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime), user.LastDailyRewardDate);
+
+        var wallet = await walletRepository.GetByUserIdAsync(existingUserId);
+        Assert.NotNull(wallet);
+        Assert.Equal(105_000m, wallet!.Balance);
+
+        var transactions = await walletTransactionRepository.GetByWalletIdAsync(wallet.Id, 0, 10);
+        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.DailyReward && t.Amount == 5_000m);
+
+        Assert.Equal(1, ledgerRepository.Count);
+    }
 
     [Fact]
     public async Task Callback_WithUnknownReturnUrlInState_ReturnsForbidden()

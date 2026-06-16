@@ -8,8 +8,10 @@ using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.Market.Interfaces;
 using OsuStocks.Domain.Repositories;
+using OsuStocks.Application.Features.DailyLogin.Services;
 using OsuStocks.Application.Features.Trading.Services;
 using OsuStocks.Infrastructure.AntiAbuse;
+using OsuStocks.Infrastructure.DailyLogin;
 using OsuStocks.Infrastructure.Authentication;
 using OsuStocks.Infrastructure.Market;
 using OsuStocks.Infrastructure.Market.Options;
@@ -45,6 +47,7 @@ public static class DependencyInjection
         services.Configure<MarketEngineOptions>(configuration.GetSection(MarketEngineOptions.SectionName));
         services.Configure<OAuthReturnUrlOptions>(configuration.GetSection(OAuthReturnUrlOptions.SectionName));
         services.Configure<AntiAbuseOptions>(configuration.GetSection(AntiAbuseOptions.SectionName));
+        services.Configure<DailyRewardOptions>(configuration.GetSection(DailyRewardOptions.SectionName));
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(postgresConnection, npgsqlOptions =>
@@ -79,11 +82,14 @@ public static class DependencyInjection
         services.AddScoped<IUserAchievementRepository, UserAchievementRepository>();
         services.AddScoped<IUserMissionCompletionRepository, UserMissionCompletionRepository>();
         services.AddScoped<IProgressionMetricsReadRepository, ProgressionMetricsReadRepository>();
+        services.AddScoped<IDailyLoginRewardRepository, DailyLoginRewardRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
         services.AddSingleton<IAntiAbuseSettings, AntiAbuseSettings>();
+        services.AddSingleton<IDailyRewardSettings, DailyRewardSettings>();
         services.AddScoped<ITradingGuardService, TradingGuardService>();
+        services.AddScoped<IDailyLoginRewardService, DailyLoginRewardService>();
         services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
         services.AddSingleton<OsuStocks.Domain.Investor.Interfaces.IInvestorLevelCalculator,
             OsuStocks.Domain.Investor.Services.InvestorLevelCalculator>();

@@ -24,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<InvestorProfile> InvestorProfiles => Set<InvestorProfile>();
     public DbSet<UserAchievement> UserAchievements => Set<UserAchievement>();
     public DbSet<UserMissionCompletion> UserMissionCompletions => Set<UserMissionCompletion>();
+    public DbSet<DailyLoginReward> DailyLoginRewards => Set<DailyLoginReward>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

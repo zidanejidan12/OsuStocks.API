@@ -11,6 +11,12 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
         return dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    public Task<User?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // Tracked (no AsNoTracking) so callers can mutate and persist the user's cached daily-reward fields.
+        return dbContext.Users.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    }
+
     public Task<User?> GetByOsuUserIdAsync(long osuUserId, CancellationToken cancellationToken = default)
     {
         return dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.OsuUserId == osuUserId, cancellationToken);

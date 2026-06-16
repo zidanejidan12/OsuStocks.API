@@ -22,6 +22,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         builder.Property(x => x.UpdatedBy).HasColumnName("updated_by").HasMaxLength(100);
         builder.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
+        builder.Property(x => x.DailyRewardStreak).HasColumnName("daily_reward_streak").HasDefaultValue(0).IsRequired();
+        builder.Property(x => x.LastDailyRewardDate).HasColumnName("last_daily_reward_date").HasColumnType("date");
 
         builder.HasIndex(x => x.OsuUserId).IsUnique().HasDatabaseName("uq_users_osu_user_id");
         builder.HasIndex(x => x.Username).HasDatabaseName("ix_users_username");

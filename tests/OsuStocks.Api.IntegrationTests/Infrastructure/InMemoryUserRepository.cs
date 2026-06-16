@@ -17,6 +17,12 @@ internal sealed class InMemoryUserRepository : IUserRepository
         return Task.FromResult(Clone(user));
     }
 
+    public Task<User?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        _usersById.TryGetValue(id, out var user);
+        return Task.FromResult(Clone(user));
+    }
+
     public Task<User?> GetByOsuUserIdAsync(long osuUserId, CancellationToken cancellationToken = default)
     {
         if (!_idsByOsuUserId.TryGetValue(osuUserId, out var userId))
@@ -63,12 +69,15 @@ internal sealed class InMemoryUserRepository : IUserRepository
             OsuUserId = user.OsuUserId,
             Username = user.Username,
             AvatarUrl = user.AvatarUrl,
+            CountryCode = user.CountryCode,
             Role = user.Role,
             CreatedAt = user.CreatedAt,
             CreatedBy = user.CreatedBy,
             UpdatedAt = user.UpdatedAt,
             UpdatedBy = user.UpdatedBy,
-            LastLoginAt = user.LastLoginAt
+            LastLoginAt = user.LastLoginAt,
+            DailyRewardStreak = user.DailyRewardStreak,
+            LastDailyRewardDate = user.LastDailyRewardDate
         };
     }
 }

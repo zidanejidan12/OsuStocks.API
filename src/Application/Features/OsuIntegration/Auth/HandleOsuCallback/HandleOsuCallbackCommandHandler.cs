@@ -1,6 +1,8 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
+using OsuStocks.Application.Features.DailyLogin.Services;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
@@ -18,7 +20,9 @@ public sealed class HandleOsuCallbackCommandHandler(
     IWalletTransactionRepository walletTransactionRepository,
     IPortfolioRepository portfolioRepository,
     IApplicationDbContext dbContext,
-    IOAuthReturnUrlPolicy returnUrlPolicy)
+    IOAuthReturnUrlPolicy returnUrlPolicy,
+    IDailyLoginRewardService dailyLoginRewardService,
+    ILogger<HandleOsuCallbackCommandHandler> logger)
     : IRequestHandler<HandleOsuCallbackCommand, Result<HandleOsuCallbackResponse>>
 {
     private const decimal StartingCredits = 100_000m;
@@ -104,6 +108,23 @@ public sealed class HandleOsuCallbackCommandHandler(
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await osuTokenManager.SaveUserTokenAsync(user.Id, osuToken, cancellationToken);
+
+            // Best-effort: grant the daily-login reward for the current UTC day. Idempotent per day (the
+            // ledger's unique index guards it), so it coexists safely with the explicit
+            // POST /api/v1/daily-login/claim endpoint. ALL exceptions are caught and logged at warning
+            // level — including a DbUpdateConcurrencyException from a wallet RowVersion conflict, which the
+            // explicit claim endpoint would instead surface as a 409. A reward failure must never break the
+            // login redirect; the user can still claim later via the endpoint.
+            try
+            {
+                await dailyLoginRewardService.GrantDailyRewardAsync(user.Id, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Daily-login reward grant failed for user {UserId} during OAuth callback; login continues.",
+                    user.Id);
+            }
 
             var appToken = appTokenService.CreateToken(user.Id, user.OsuUserId, user.Username, user.Role);
             return Result.Success(new HandleOsuCallbackResponse(appToken.AccessToken, appToken.ExpiresAt, oauthState.ReturnUrl));

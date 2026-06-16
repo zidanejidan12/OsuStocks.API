@@ -29,6 +29,11 @@ internal sealed class InMemoryWalletRepository : IWalletRepository
         return Task.FromResult(Clone(wallet));
     }
 
+    public Task<Wallet?> GetByUserIdForUpdateAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return GetByUserIdAsync(userId, cancellationToken);
+    }
+
     public Task<WalletBalanceReadModel?> GetBalanceByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         if (!_walletIdsByUserId.TryGetValue(userId, out var walletId))
