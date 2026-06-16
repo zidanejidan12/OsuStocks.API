@@ -9,7 +9,7 @@ namespace OsuStocks.Infrastructure.OsuIntegration.Api;
 /// cannot exceed osu!'s request budget no matter how many synchronization jobs run concurrently.
 /// Registered as a singleton; the <see cref="OsuApiRateLimitingHandler"/> acquires a permit per request.
 /// </summary>
-internal sealed class OsuApiRateLimiter : IAsyncDisposable
+public sealed class OsuApiRateLimiter : IAsyncDisposable
 {
     public OsuApiRateLimiter(IOptions<OsuApiOptions> options)
     {

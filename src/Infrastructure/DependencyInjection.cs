@@ -18,6 +18,7 @@ using OsuStocks.Infrastructure.Market.Options;
 using OsuStocks.Infrastructure.BackgroundJobs;
 using OsuStocks.Infrastructure.Caching;
 using OsuStocks.Infrastructure.OsuIntegration.Api;
+using OsuStocks.Infrastructure.OsuIntegration.Telemetry;
 using OsuStocks.Infrastructure.OsuIntegration.OAuth;
 using OsuStocks.Infrastructure.OsuIntegration.Options;
 using OsuStocks.Infrastructure.OsuIntegration.Tokens;
@@ -115,6 +116,7 @@ public static class DependencyInjection
 
         services.AddSingleton<OsuApiRateLimiter>();
         services.AddTransient<OsuApiRateLimitingHandler>();
+        services.AddOsuApiObservability(configuration);
 
         services.AddHttpClient<IOsuApiClient, OsuApiClient>((serviceProvider, client) =>
         {
