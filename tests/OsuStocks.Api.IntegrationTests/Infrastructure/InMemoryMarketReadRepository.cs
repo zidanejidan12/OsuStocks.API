@@ -53,6 +53,14 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
             query = query.Where(x => x.PlayerName.Contains(term, StringComparison.OrdinalIgnoreCase));
         }
 
+        if (!string.IsNullOrWhiteSpace(spec.Country))
+        {
+            var country = spec.Country.Trim();
+            query = query.Where(x =>
+                !string.IsNullOrEmpty(x.CountryCode)
+                && string.Equals(x.CountryCode, country, StringComparison.OrdinalIgnoreCase));
+        }
+
         query = spec.Sort?.Trim().ToLowerInvariant() switch
         {
             "price_asc" => query.OrderBy(x => x.CurrentPrice).ThenBy(x => x.PlayerName),
@@ -82,6 +90,19 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
             .ToList();
 
         return Task.FromResult(new MarketStocksPageReadModel(items, totalCount));
+    }
+
+    public Task<IReadOnlyList<MarketCountryReadModel>> GetCountriesAsync(CancellationToken cancellationToken = default)
+    {
+        var countries = _stocks
+            .Where(x => !string.IsNullOrEmpty(x.CountryCode))
+            .GroupBy(x => x.CountryCode!)
+            .Select(g => new MarketCountryReadModel(g.Key, g.Count()))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.CountryCode, StringComparer.Ordinal)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<MarketCountryReadModel>>(countries);
     }
 
     public Task<IReadOnlyList<MarketStockListItemReadModel>> GetTopMoversAsync(int limit, CancellationToken cancellationToken = default)

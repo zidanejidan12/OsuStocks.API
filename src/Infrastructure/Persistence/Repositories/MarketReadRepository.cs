@@ -58,6 +58,12 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             rowQuery = rowQuery.Where(x => x.PlayerName.ToLower().Contains(searchTerm));
         }
 
+        if (!string.IsNullOrWhiteSpace(spec.Country))
+        {
+            var country = spec.Country.Trim().ToLower();
+            rowQuery = rowQuery.Where(x => x.CountryCode != null && x.CountryCode.ToLower() == country);
+        }
+
         // The 24h change depends on a reference price that is a coalesce of correlated
         // subqueries and the current price; EF cannot translate that arithmetic (nor sort
         // by it) in SQL. The tracked-stock set is small, so we materialize the translatable
@@ -73,6 +79,22 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             .ToList();
 
         return new MarketStocksPageReadModel(pageItems, totalCount);
+    }
+
+    public async Task<IReadOnlyList<MarketCountryReadModel>> GetCountriesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        // One row per tracked stock, grouped by the player's country. Null/empty codes are excluded so
+        // only real countries appear. Ordered by count desc then code asc to match the API contract.
+        return await (
+            from stock in dbContext.PlayerStocks.AsNoTracking()
+            join player in dbContext.TrackedPlayers.AsNoTracking()
+                on stock.TrackedPlayerId equals player.Id
+            where player.CountryCode != null && player.CountryCode != string.Empty
+            group stock by player.CountryCode into g
+            orderby g.Count() descending, g.Key ascending
+            select new MarketCountryReadModel(g.Key!, g.Count()))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<MarketStockListItemReadModel>> GetTopMoversAsync(
