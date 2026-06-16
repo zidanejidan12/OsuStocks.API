@@ -29,3 +29,6 @@ src/Worker/appsettings.Local.json
 
 # Claude workfspace files
 .claude
+
+# Design docs kept local-only (not published to GitHub)
+docs/

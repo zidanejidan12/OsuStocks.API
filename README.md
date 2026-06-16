@@ -18,19 +18,22 @@ Implemented modules:
 - Portfolio: holdings and portfolio summary
 - Wallet: balance and transaction ledger
 - Market Engine:
-  - Inputs: `BuyOrderExecuted`, `SellOrderExecuted`, `TopPlayDetected`, `PpIncreased`, `PlayerInactive`
+  - Inputs: `BuyOrderExecuted`, `SellOrderExecuted`, `TopPlayDetected` (scaled by the play's pp relative to the player's pp), `PpIncreased` (symmetric — gains lift, losses lower), `RankChanged` (bidirectional — climbing lifts price, slipping lowers it), `PlayerInactive`
   - Output: `PriceChanged`
-  - Coefficient-based pricing + price floor + stock price history recording
+  - Multiplicative, per-event-capped, price-floored pricing + stock price history recording
 - Market Intelligence (Phase 2):
   - Market activity event feed: global (`/market/events`) and per-stock (`/market/events/{stockId}`)
   - OHLC candles via `GET /market/stocks/{id}/history?range=` (raw price points when `range` is omitted)
   - Stock analytics (`/market/stocks/{id}/analytics`): volume/value 24h & 7d, 7d volatility, ownership count, active traders, market cap
   - Trending (`/market/trending`): most bought/sold, fastest rising/falling, highest volume
   - Leaderboards (`/leaderboards/{wealth,profit,traders}?period=`)
+  - Country filter: `GET /market/stocks?country=XX` + `GET /market/countries` (distinct countries with per-country counts)
+- Caching: Redis read-model cache on hot read paths (leaderboards, trending, market list/detail) with short TTLs and per-query keys
+- Daily Login: 7-day cycle rewards with UTC-day idempotency (`/daily-login` claim + status; best-effort grant during osu! login)
 - Notifications: holder fan-out on market events + list / unread filter / mark-read / mark-all-read
 - Avatars & country codes: surfaced on market, leaderboard, activity-feed, and `/auth/me` payloads
 - Admin: market settings management (multipliers + maintenance mode toggle)
-- Background jobs (Hangfire/Worker): tiered osu sync (1m/5m/15m), daily inactivity decay (03:00), daily wealth-snapshot capture (02:30)
+- Background jobs (Hangfire/Worker): 4-tier osu sync (1m/5m/15m + hourly long tail) with token-bucket rate limiting + bounded concurrency, daily inactivity decay (03:00), daily wealth-snapshot capture (02:30), daily snapshot retention (04:00) and market-history retention (04:30)
 - Security: CORS, rate limiting, global exception handler, concurrency conflict handling (HTTP 409), anti-abuse (trade cooldown, position limits, rapid trading detection)
 - Deployment: Docker (API + Worker + PostgreSQL + Redis + nginx)
 
@@ -57,20 +60,6 @@ Implemented modules:
 
 ```text
 .
-|-- docs/
-|   |-- ARCHITECTURE.md
-|   |-- API_SPEC.md
-|   |-- BACKEND_ACCEPTANCE_TESTS.md
-|   |-- BUSINESS_RULES.md
-|   |-- CODING_STANDARDS.md
-|   |-- DATABASE.md
-|   |-- DEPLOYMENT.md
-|   |-- DOMAIN_MODEL.md
-|   |-- FRONTEND_API_CONTRACT.md
-|   |-- OPERATIONS.md
-|   |-- PHASE2_MARKET_INTELLIGENCE_PLAN.md
-|   |-- ROADMAP.md
-|   `-- USE_CASES.md
 |-- src/
 |   |-- Api/            # Minimal API endpoints, auth, Swagger, Hangfire dashboard
 |   |-- Application/    # CQRS handlers, validators, behaviors, event handlers
@@ -111,9 +100,9 @@ Key sections:
 
 - `TradeBuyImpactPerShare`
 - `TradeSellImpactPerShare`
-- `TopPlayImpact`
-- `PpImpactPerPoint`
-- `MaxPpImpact`
+- `TopPlayImpactScale`, `MaxTopPlayImpact`, `MinTopPlayImpact` (top-play impact scales with play pp ÷ player pp, clamped)
+- `PpImpactPerPoint`, `MaxPpImpact` (symmetric: applies to pp gains and losses)
+- `RankChangeImpactScale`, `MaxRankChangeImpact` (bidirectional rank-change impact)
 - `InactivityDecayImpact`
 - `InactivityThresholdDays`
 - `PriceFloor`
@@ -133,13 +122,13 @@ Important: `OsuOAuth:RedirectUri` must exactly match the callback URL registered
 ### Docker Compose (recommended)
 
 ```bash
-# Create .env with production secrets (see docs/DEPLOYMENT.md)
+# Create .env with production secrets (DB/Redis passwords, JWT signing key, osu! OAuth)
 docker compose up -d --build
 ```
 
 Services started: api, worker, postgres, redis, nginx.
 
-See `docs/DEPLOYMENT.md` for full setup, environment variables, and TLS configuration.
+Configure all secrets via environment variables / `.env` (see Configuration above). TLS is terminated at the nginx reverse proxy.
 
 ### Manual Deployment
 
@@ -200,10 +189,13 @@ Implemented route groups (all under `/api/v1`):
 
 - `/auth` — `/login`, `/callback`, `/me` (rate limited: 10 req/min)
 - `/market` — overview
-- `/market/stocks` — list, `/{id}` details, `/{id}/history?range=` (OHLC candles, or raw points without `range`), `/{id}/analytics`
+- `/market/stocks` — list (`?search=`, `?sort=`, `?country=`, paged), `/{id}` details (incl. global rank + pp), `/{id}/history?range=` (OHLC candles, or raw points without `range`), `/{id}/analytics`, `/{id}/top-plays`
+- `/market/countries` — distinct tracked countries with per-country counts
+- `/market/movers` — live top movers
 - `/market/events` — global activity feed, `/{stockId}` per-stock feed
 - `/market/trending` — most bought/sold, fastest rising/falling, highest volume
 - `/leaderboards` — `/wealth`, `/profit`, `/traders` (`?period=`)
+- `/daily-login` — `/claim`, status (7-day cycle rewards)
 - `/trading` — `/buy`, `/sell`, `/history` (rate limited: 30 req/min)
 - `/portfolio` — summary, `/holdings`
 - `/wallet` — balance, `/transactions`
@@ -250,29 +242,21 @@ git push origin v1.0.0
 
 This builds production artifacts for both API and Worker, and pushes Docker images to GitHub Container Registry. The image names derive from `github.repository` (owner/repo), so for this repo they are `ghcr.io/zidanejidan12/osustocks.api/api` and `ghcr.io/zidanejidan12/osustocks.api/worker` (each tagged with the version and `latest`).
 
-## QA Acceptance Checklist
-
-Use this document for milestone verification without reading source code:
-
-- `docs/BACKEND_ACCEPTANCE_TESTS.md`
-
 ## Contribution Guide
 
-1. Read all docs in `docs/` before coding, especially:
-   - `docs/ARCHITECTURE.md`
-   - `docs/CODING_STANDARDS.md`
-   - `docs/API_SPEC.md`
-2. Keep Clean Architecture boundaries strict.
-3. Follow vertical-slice implementation style:
+> Detailed design docs (architecture, coding standards, API spec, domain model, etc.) are maintained locally and are not published to this repository.
+
+1. Keep Clean Architecture boundaries strict (`Domain ← Application ← Api`; `Domain ← Infrastructure`).
+2. Follow vertical-slice implementation style:
    - Command/Query
    - Handler
    - Validator
    - Endpoint
-4. Use MediatR + FluentValidation + Result pattern for use cases.
-5. For DB changes:
+3. Use MediatR + FluentValidation + Result pattern for use cases.
+4. For DB changes:
    - Update entities/configurations
    - Add migration in `src/Infrastructure/Persistence/Migrations`
-6. Before PR:
+5. Before PR:
 
 ```powershell
 dotnet build OsuStocks.sln
