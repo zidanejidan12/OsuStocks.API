@@ -7,5 +7,6 @@ public sealed record GetMarketStocksQuery(
     int Page,
     int PageSize,
     string? Sort,
-    string? Search)
+    string? Search,
+    string? Country)
     : IRequest<Result<GetMarketStocksResponse>>;

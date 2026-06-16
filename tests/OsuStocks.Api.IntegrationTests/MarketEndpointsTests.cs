@@ -61,6 +61,58 @@ public sealed class MarketEndpointsTests
     }
 
     [Fact]
+    public async Task GetMarketStocks_FiltersByCountry()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
+
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, "AU", 1500m, 1000, 12m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, "US", 1200m, 400, 2m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, "AU", 900m, 800, -5m, null, null));
+
+        // Lower-case to confirm the filter is case-insensitive.
+        var response = await client.GetAsync("/api/v1/market/stocks?country=au");
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MarketStocksPageResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.TotalCount);
+        Assert.Equal(2, payload.Items.Count);
+        Assert.All(payload.Items, x => Assert.Equal("AU", x.CountryCode));
+    }
+
+    [Fact]
+    public async Task GetMarketCountries_ReturnsAggregatedCounts()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var scope = factory.Services.CreateScope();
+        var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
+
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, "AU", 1500m, 1000, 12m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, "AU", 900m, 800, -5m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, "US", 1200m, 400, 2m, null, null));
+        // Null/empty country codes are excluded from the aggregation.
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 800m, 100, 0m, null, null));
+
+        var response = await client.GetAsync("/api/v1/market/countries");
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MarketCountriesResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Items.Count);
+        // Sorted by count desc, then countryCode asc.
+        Assert.Equal("AU", payload.Items[0].CountryCode);
+        Assert.Equal(2, payload.Items[0].Count);
+        Assert.Equal("US", payload.Items[1].CountryCode);
+        Assert.Equal(1, payload.Items[1].Count);
+    }
+
+    [Fact]
     public async Task GetMarketStockDetails_ReturnsSingleStock()
     {
         await using var factory = new CustomWebApplicationFactory();
@@ -132,9 +184,17 @@ public sealed class MarketEndpointsTests
     private sealed record MarketStockItemResponse(
         [property: JsonPropertyName("stockId")] Guid StockId,
         [property: JsonPropertyName("playerName")] string PlayerName,
+        [property: JsonPropertyName("countryCode")] string? CountryCode,
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,
         [property: JsonPropertyName("volume")] long Volume,
         [property: JsonPropertyName("priceChange24h")] decimal PriceChange24h);
+
+    private sealed record MarketCountriesResponse(
+        [property: JsonPropertyName("items")] List<MarketCountryItemResponse> Items);
+
+    private sealed record MarketCountryItemResponse(
+        [property: JsonPropertyName("countryCode")] string CountryCode,
+        [property: JsonPropertyName("count")] int Count);
 
     private sealed record MarketStockDetailsResponse(
         [property: JsonPropertyName("stockId")] Guid StockId,
