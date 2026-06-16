@@ -29,11 +29,15 @@ public sealed class MarketEventProcessingServiceTests
         var coefficientsProvider = new StaticMarketCoefficientsProvider(new MarketPricingCoefficients(
             0.01m,
             0.01m,
-            0.05m,
+            0.6m,
+            0.10m,
+            0.005m,
             0.001m,
             0.10m,
             0.005m,
-            1m));
+            1m,
+            0.5m,
+            0.05m));
 
         IMarketEventProcessingService service = new MarketEventProcessingService(
             stockRepository,
@@ -80,11 +84,15 @@ public sealed class MarketEventProcessingServiceTests
         var coefficientsProvider = new StaticMarketCoefficientsProvider(new MarketPricingCoefficients(
             0.01m,
             0.01m,
-            0.03m,
+            0.6m,
+            0.10m,
+            0.005m,
             0.001m,
             0.10m,
             0.50m,
-            1m));
+            1m,
+            0.5m,
+            0.05m));
 
         IMarketEventProcessingService service = new MarketEventProcessingService(
             stockRepository,
@@ -200,6 +208,12 @@ public sealed class MarketEventProcessingServiceTests
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<StockPriceHistory>>(items);
+        }
+
+        public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+        {
+            var removed = _items.RemoveAll(x => x.CreatedAt < cutoff);
+            return Task.FromResult(removed);
         }
     }
 }

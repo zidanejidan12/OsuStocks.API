@@ -5,18 +5,17 @@ using OsuStocks.Domain.Market.Models;
 
 namespace OsuStocks.Application.Features.Market.EventHandlers;
 
-public sealed class TopPlayDetectedEventHandler(
+public sealed class RankChangedEventHandler(
     IMarketEventProcessingService processingService,
     IPublisher publisher)
-    : INotificationHandler<TopPlayDetectedNotification>
+    : INotificationHandler<RankChangedNotification>
 {
-    public async Task Handle(TopPlayDetectedNotification notification, CancellationToken cancellationToken)
+    public async Task Handle(RankChangedNotification notification, CancellationToken cancellationToken)
     {
-        var topPlay = notification.Event;
         var priceChanged = await processingService.ApplyForTrackedPlayerAsync(
-            topPlay.TrackedPlayerId,
-            MarketPriceInput.TopPlay(topPlay.NewTopScorePp ?? 0m, topPlay.PlayerCurrentPp ?? 0m),
-            topPlay.OccurredAt,
+            notification.Event.TrackedPlayerId,
+            MarketPriceInput.RankChange(notification.Event.PreviousRank, notification.Event.CurrentRank),
+            notification.Event.OccurredAt,
             cancellationToken);
 
         if (priceChanged is not null)

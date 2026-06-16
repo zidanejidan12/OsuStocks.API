@@ -39,6 +39,13 @@ public sealed class OsuSynchronizationRecurringJobRegistrar(IRecurringJobManager
             job => job.RunAsync(),
             Cron.Daily(4, 0));
 
+        // Prune old price-history / market-event rows (90-day window) at :30 past the snapshot prune,
+        // so the rank-change-driven append-only tables stay bounded.
+        recurringJobManager.AddOrUpdate<MarketHistoryRetentionRecurringJob>(
+            "market-history-retention",
+            job => job.RunAsync(),
+            Cron.Daily(4, 30));
+
         recurringJobManager.AddOrUpdate<InactivityDecayRecurringJob>(
             "inactivity-decay",
             job => job.RunAsync(),
