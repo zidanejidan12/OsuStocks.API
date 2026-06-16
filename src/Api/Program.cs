@@ -13,6 +13,7 @@ using OsuStocks.Application;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Infrastructure;
 using OsuStocks.Infrastructure.Authentication;
+using OsuStocks.Infrastructure.OsuIntegration.Telemetry;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -74,7 +75,11 @@ builder.Services.AddHealthChecks()
         sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Redis")!,
         name: "redis",
         failureStatus: HealthStatus.Unhealthy,
-        tags: ["cache", "ready"]);
+        tags: ["cache", "ready"])
+    .AddCheck<OsuApiHealthCheck>(
+        name: "osu-api",
+        failureStatus: HealthStatus.Degraded,
+        tags: ["external", "live"]);
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt configuration section is missing.");
