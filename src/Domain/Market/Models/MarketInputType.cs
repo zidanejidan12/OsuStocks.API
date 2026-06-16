@@ -6,5 +6,6 @@ public enum MarketInputType
     SellOrderExecuted = 2,
     TopPlayDetected = 3,
     PpIncreased = 4,
-    PlayerInactive = 5
+    PlayerInactive = 5,
+    RankChanged = 6
 }

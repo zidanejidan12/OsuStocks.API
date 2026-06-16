@@ -17,4 +17,9 @@ public sealed class MarketEngineOptions
     public decimal InactivityDecayImpact { get; set; } = 0.005m;
     public int InactivityThresholdDays { get; set; } = 7;
     public decimal PriceFloor { get; set; } = 1m;
+
+    // Rank change is bidirectional: impact = clamp(scale * relativeRankMove, -max, +max).
+    // relativeRankMove = (previousRank - currentRank) / previousRank.
+    public decimal RankChangeImpactScale { get; set; } = 0.5m;
+    public decimal MaxRankChangeImpact { get; set; } = 0.05m;
 }

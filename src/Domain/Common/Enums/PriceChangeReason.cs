@@ -7,5 +7,6 @@ public enum PriceChangeReason
     PPGain = 3,
     TopPlay = 4,
     Decay = 5,
-    AdminAdjustment = 6
+    AdminAdjustment = 6,
+    RankChange = 7
 }

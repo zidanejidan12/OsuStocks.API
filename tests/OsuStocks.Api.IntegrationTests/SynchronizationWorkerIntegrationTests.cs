@@ -88,7 +88,8 @@ public sealed class SynchronizationWorkerIntegrationTests
 
         Assert.Equal(2, summary.TrackedPlayers);
         Assert.Equal(2, summary.SnapshotsCreated);
-        Assert.Equal(3, summary.EventsDetected);
+        // mrekk: PpIncreased + TopPlayDetected + RankChanged (500->450, a 10% move); whitecat: PlayerInactive.
+        Assert.Equal(4, summary.EventsDetected);
         Assert.Equal(1, summary.RankImprovementsDetected);
 
         Assert.Equal(4, playerSnapshotRepository.AddedCountSinceStart);
@@ -96,8 +97,9 @@ public sealed class SynchronizationWorkerIntegrationTests
         var eventTypes = marketEventRepository.Events.Select(x => x.EventType).ToList();
         Assert.Contains("PpIncreased", eventTypes);
         Assert.Contains("TopPlayDetected", eventTypes);
+        Assert.Contains("RankChanged", eventTypes);
         Assert.Contains("PlayerInactive", eventTypes);
-        Assert.Equal(3, eventTypes.Count);
+        Assert.Equal(4, eventTypes.Count);
 
         var updatedStockA = await playerStockRepository.GetByTrackedPlayerIdAsync(tier1A.Id);
         var updatedStockB = await playerStockRepository.GetByTrackedPlayerIdAsync(tier1B.Id);

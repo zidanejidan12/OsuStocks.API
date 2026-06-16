@@ -17,7 +17,9 @@ public sealed class MarketPriceEngineTests
         PpImpactPerPoint: 0.001m,
         MaxPpImpact: 0.10m,
         InactivityDecayImpact: 0.50m,
-        PriceFloor: 1m);
+        PriceFloor: 1m,
+        RankChangeImpactScale: 0.5m,
+        MaxRankChangeImpact: 0.05m);
 
     [Fact]
     public void Calculate_BuyOrder_IncreasesPriceUsingConfiguredCoefficient()
@@ -64,6 +66,43 @@ public sealed class MarketPriceEngineTests
         var result = _engine.Calculate(100m, MarketPriceInput.TopPlay(playPp: 0m, playerPp: 0m), Coefficients);
 
         Assert.Equal(0.005m, result.PercentageChange);
+    }
+
+    [Fact]
+    public void Calculate_RankImproved_IncreasesPrice()
+    {
+        // 1000 -> 800 = +20% relative; impact = 0.5 * 0.2 = 0.10 -> capped at MaxRankChangeImpact 0.05.
+        var result = _engine.Calculate(100m, MarketPriceInput.RankChange(previousRank: 1000, currentRank: 800), Coefficients);
+
+        Assert.Equal(0.05m, result.PercentageChange);
+        Assert.Equal(105m, result.NewPrice);
+    }
+
+    [Fact]
+    public void Calculate_RankDropped_DecreasesPrice()
+    {
+        // 1000 -> 1050 = -5% relative; impact = 0.5 * -0.05 = -0.025 (within cap).
+        var result = _engine.Calculate(100m, MarketPriceInput.RankChange(previousRank: 1000, currentRank: 1050), Coefficients);
+
+        Assert.Equal(-0.025m, result.PercentageChange);
+        Assert.Equal(97.5m, result.NewPrice);
+    }
+
+    [Fact]
+    public void Calculate_RankUnchangedOrMissing_NoImpact()
+    {
+        Assert.Equal(0m, _engine.Calculate(100m, MarketPriceInput.RankChange(900, 900), Coefficients).PercentageChange);
+        Assert.Equal(0m, _engine.Calculate(100m, MarketPriceInput.RankChange(0, 900), Coefficients).PercentageChange);
+    }
+
+    [Fact]
+    public void Calculate_PpDecrease_LowersPrice()
+    {
+        // pp dropped 100 -> impact = -100 * 0.001 = -0.10 -> within cap.
+        var result = _engine.Calculate(100m, MarketPriceInput.PpIncrease(1000m, 900m), Coefficients);
+
+        Assert.Equal(-0.10m, result.PercentageChange);
+        Assert.Equal(90m, result.NewPrice);
     }
 
     [Fact]

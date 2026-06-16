@@ -35,7 +35,9 @@ public sealed class MarketEventProcessingServiceTests
             0.001m,
             0.10m,
             0.005m,
-            1m));
+            1m,
+            0.5m,
+            0.05m));
 
         IMarketEventProcessingService service = new MarketEventProcessingService(
             stockRepository,
@@ -88,7 +90,9 @@ public sealed class MarketEventProcessingServiceTests
             0.001m,
             0.10m,
             0.50m,
-            1m));
+            1m,
+            0.5m,
+            0.05m));
 
         IMarketEventProcessingService service = new MarketEventProcessingService(
             stockRepository,
