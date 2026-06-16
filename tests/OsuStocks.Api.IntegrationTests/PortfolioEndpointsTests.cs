@@ -125,7 +125,7 @@ public sealed class PortfolioEndpointsTests(PostgresTestcontainerFixture fixture
 
     private sealed record PortfolioHoldingResponse(
         [property: JsonPropertyName("stockId")] Guid StockId,
-        [property: JsonPropertyName("quantity")] int Quantity,
+        [property: JsonPropertyName("quantity")] decimal Quantity,
         [property: JsonPropertyName("averagePrice")] decimal AveragePrice,
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,
         [property: JsonPropertyName("costBasis")] decimal CostBasis,

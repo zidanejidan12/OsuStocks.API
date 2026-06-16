@@ -4,7 +4,7 @@ public sealed record PortfolioHoldingSummaryReadModel(
     Guid HoldingId,
     Guid StockId,
     string? PlayerName,
-    int Quantity,
+    decimal Quantity,
     decimal AveragePrice,
     decimal CurrentPrice,
     decimal CostBasis,

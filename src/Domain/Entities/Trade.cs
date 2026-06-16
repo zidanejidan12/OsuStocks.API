@@ -8,7 +8,7 @@ public sealed class Trade
     public Guid UserId { get; set; }
     public Guid StockId { get; set; }
     public TradeType TradeType { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalAmount { get; set; }
     public DateTimeOffset ExecutedAt { get; set; }

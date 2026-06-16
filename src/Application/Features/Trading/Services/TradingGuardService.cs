@@ -48,8 +48,8 @@ public sealed class TradingGuardService(
     public async Task<Result> CheckPositionLimitAsync(
         Guid userId,
         Guid stockId,
-        int requestedQuantity,
-        int currentHoldingQuantity,
+        decimal requestedQuantity,
+        decimal currentHoldingQuantity,
         CancellationToken cancellationToken = default)
     {
         var maxPercentage = antiAbuseSettings.MaxOwnershipPercentage;

@@ -13,10 +13,10 @@ internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketRead
             .AsNoTracking()
             .CountAsync(cancellationToken);
 
-        var totalVolume = await dbContext.Trades
+        var totalVolume = (long)Math.Round(await dbContext.Trades
             .AsNoTracking()
-            .Select(x => (long?)x.Quantity)
-            .SumAsync(cancellationToken) ?? 0L;
+            .Select(x => (decimal?)x.Quantity)
+            .SumAsync(cancellationToken) ?? 0m);
 
         var rows = await BuildStockMetricRowQuery(DateTimeOffset.UtcNow.AddHours(-24))
             .ToListAsync(cancellationToken);
@@ -266,14 +266,14 @@ ORDER BY o.bucket_start ASC;";
         var trades24h = dbContext.Trades
             .AsNoTracking()
             .Where(x => x.StockId == stockId && x.ExecutedAt >= cutoff24h);
-        var volume24hShares = await trades24h.Select(x => (long?)x.Quantity).SumAsync(cancellationToken) ?? 0L;
+        var volume24hShares = (long)Math.Round(await trades24h.Select(x => (decimal?)x.Quantity).SumAsync(cancellationToken) ?? 0m);
         var volume24hValue = await trades24h.Select(x => (decimal?)x.TotalAmount).SumAsync(cancellationToken) ?? 0m;
         var activeTraders24h = await trades24h.Select(x => x.UserId).Distinct().CountAsync(cancellationToken);
 
         var trades7d = dbContext.Trades
             .AsNoTracking()
             .Where(x => x.StockId == stockId && x.ExecutedAt >= cutoff7d);
-        var volume7dShares = await trades7d.Select(x => (long?)x.Quantity).SumAsync(cancellationToken) ?? 0L;
+        var volume7dShares = (long)Math.Round(await trades7d.Select(x => (decimal?)x.Quantity).SumAsync(cancellationToken) ?? 0m);
         var volume7dValue = await trades7d.Select(x => (decimal?)x.TotalAmount).SumAsync(cancellationToken) ?? 0m;
 
         var ownershipCount = await dbContext.Holdings
@@ -283,11 +283,11 @@ ORDER BY o.bucket_start ASC;";
             .Distinct()
             .CountAsync(cancellationToken);
 
-        var totalHeldShares = await dbContext.Holdings
+        var totalHeldShares = (long)Math.Round(await dbContext.Holdings
             .AsNoTracking()
             .Where(x => x.StockId == stockId && x.Quantity > 0)
-            .Select(x => (long?)x.Quantity)
-            .SumAsync(cancellationToken) ?? 0L;
+            .Select(x => (decimal?)x.Quantity)
+            .SumAsync(cancellationToken) ?? 0m);
 
         var volatility = await GetVolatility7dAsync(stockId, cutoff7d, cancellationToken);
 
@@ -352,10 +352,10 @@ ORDER BY o.bucket_start ASC;";
                 AvatarUrl = player.AvatarUrl,
                 CountryCode = player.CountryCode,
                 CurrentPrice = stock.CurrentPrice,
-                Volume = dbContext.Trades
+                Volume = (long)(dbContext.Trades
                     .Where(x => x.StockId == stock.Id)
-                    .Select(x => (long?)x.Quantity)
-                    .Sum() ?? 0L,
+                    .Select(x => (decimal?)x.Quantity)
+                    .Sum() ?? 0m),
                 BaselinePrice = dbContext.StockPriceHistory
                     .Where(x => x.StockId == stock.Id && x.CreatedAt <= cutoff)
                     .OrderByDescending(x => x.CreatedAt)
