@@ -185,7 +185,8 @@ public sealed class PlayerSynchronizationService(
                             score.Pp,
                             now,
                             score.CoverUrl,
-                            score.Title));
+                            score.Title,
+                            latestProfile.CurrentPp));
                     }
                 }
             }

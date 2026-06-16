@@ -12,10 +12,11 @@ public sealed class TopPlayDetectedEventHandler(
 {
     public async Task Handle(TopPlayDetectedNotification notification, CancellationToken cancellationToken)
     {
+        var topPlay = notification.Event;
         var priceChanged = await processingService.ApplyForTrackedPlayerAsync(
-            notification.Event.TrackedPlayerId,
-            MarketPriceInput.TopPlay(),
-            notification.Event.OccurredAt,
+            topPlay.TrackedPlayerId,
+            MarketPriceInput.TopPlay(topPlay.NewTopScorePp ?? 0m, topPlay.PlayerCurrentPp ?? 0m),
+            topPlay.OccurredAt,
             cancellationToken);
 
         if (priceChanged is not null)
