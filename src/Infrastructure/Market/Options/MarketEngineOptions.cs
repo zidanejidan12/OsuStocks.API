@@ -22,4 +22,9 @@ public sealed class MarketEngineOptions
     // relativeRankMove = (previousRank - currentRank) / previousRank.
     public decimal RankChangeImpactScale { get; set; } = 0.5m;
     public decimal MaxRankChangeImpact { get; set; } = 0.05m;
+
+    // Hard ceiling on how much a single trade can move a price (both directions). Bounds the
+    // pump-and-dump vector: a large order moves the price at most this much regardless of quantity.
+    // NOT scaled by the admin trade multiplier — it's a safety cap, not a tunable sensitivity.
+    public decimal MaxTradeImpact { get; set; } = 0.10m;
 }

@@ -30,6 +30,7 @@ internal sealed class MarketCoefficientsProvider(
             value.InactivityDecayImpact * decayMultiplier,
             value.PriceFloor <= 0m ? 1m : value.PriceFloor,
             value.RankChangeImpactScale * ppMultiplier,
-            value.MaxRankChangeImpact * ppMultiplier);
+            value.MaxRankChangeImpact * ppMultiplier,
+            value.MaxTradeImpact);
     }
 }

@@ -14,8 +14,12 @@ public sealed class MarketPriceEngine : IMarketPriceEngine
 
         var percentageChange = input.Type switch
         {
-            MarketInputType.BuyOrderExecuted => coefficients.TradeBuyImpactPerShare * input.Quantity,
-            MarketInputType.SellOrderExecuted => -coefficients.TradeSellImpactPerShare * input.Quantity,
+            // Trade impact is capped per order (both directions) so a single large buy/sell can't moon
+            // or crash a stock — closing the pump-and-dump vector. Other drivers clamp inside their helpers.
+            MarketInputType.BuyOrderExecuted =>
+                Math.Clamp(coefficients.TradeBuyImpactPerShare * input.Quantity, 0m, coefficients.MaxTradeImpact),
+            MarketInputType.SellOrderExecuted =>
+                Math.Clamp(-coefficients.TradeSellImpactPerShare * input.Quantity, -coefficients.MaxTradeImpact, 0m),
             MarketInputType.TopPlayDetected => CalculateTopPlayImpact(input, coefficients),
             MarketInputType.PpIncreased => CalculatePpImpact(input, coefficients),
             MarketInputType.RankChanged => CalculateRankChangeImpact(input, coefficients),
