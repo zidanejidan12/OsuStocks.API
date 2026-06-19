@@ -106,6 +106,7 @@ public static class DependencyInjection
         services.AddSingleton<IOAuthReturnUrlPolicy, OAuthReturnUrlPolicy>();
 
         services.AddScoped<OsuSynchronizationRecurringJob>();
+        services.AddScoped<SeedTrackedPlayersJob>();
         services.AddScoped<InactivityDecayRecurringJob>();
         services.AddScoped<WealthSnapshotRecurringJob>();
         services.AddScoped<SnapshotRetentionRecurringJob>();

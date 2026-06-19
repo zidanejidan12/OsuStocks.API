@@ -100,6 +100,40 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
             .ToList();
     }
 
+    public async Task<IReadOnlyList<OsuUserProfile>> GetPerformanceRankingsAsync(
+        int page,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        // osu! exposes the standard performance leaderboard 50 per page, up to page 200 (top 10k).
+        var boundedPage = Math.Clamp(page, 1, 200);
+
+        // The cursor[page] query param must be percent-encoded so it survives URI parsing.
+        var response = await SendAsync<OsuRankingsResponse>(
+            $"rankings/osu/performance?cursor%5Bpage%5D={boundedPage}",
+            accessToken,
+            cancellationToken);
+
+        var ranking = response?.Ranking;
+        if (ranking is null)
+        {
+            return [];
+        }
+
+        return ranking
+            .Where(static entry => entry.User is { Id: > 0 })
+            .Select(static entry => new OsuUserProfile(
+                entry.User!.Id,
+                entry.User.Username,
+                entry.User.AvatarUrl,
+                entry.Pp,
+                entry.GlobalRank ?? entry.User.Statistics?.GlobalRank,
+                null,
+                null,
+                entry.User.CountryCode))
+            .ToList();
+    }
+
     private async Task<OsuUserProfile> GetUserInternalAsync(
         string path,
         string accessToken,
@@ -167,6 +201,25 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
     {
         [JsonPropertyName("data")]
         public List<OsuUserResponse> Data { get; init; } = [];
+    }
+
+    private sealed class OsuRankingsResponse
+    {
+        [JsonPropertyName("ranking")]
+        public List<OsuRankingEntryResponse> Ranking { get; init; } = [];
+    }
+
+    private sealed class OsuRankingEntryResponse
+    {
+        // Rankings put the rank/pp at the statistics level and nest a compact user object.
+        [JsonPropertyName("global_rank")]
+        public int? GlobalRank { get; init; }
+
+        [JsonPropertyName("pp")]
+        public decimal Pp { get; init; }
+
+        [JsonPropertyName("user")]
+        public OsuUserResponse? User { get; init; }
     }
 
     private sealed class OsuUserResponse
