@@ -14,13 +14,13 @@ grafana.osustocks.com {
     reverse_proxy grafana:3000
 }
 
-# Frontend (OsuStocks.Web / Next.js) deploys separately and is NOT part of this
-# compose stack. Once it runs (as a container named "web" on this network, or on
-# another host), expose it here. Examples:
-#
-# app.osustocks.com {
-#     reverse_proxy web:3000          # if the FE runs as a container on this network
-# }
+# Frontend (OsuStocks.Web / Next.js) — the "web" container on this network.
+app.osustocks.com {
+    reverse_proxy web:3000
+}
+
+# Bare domain → app. Uncomment once an A record for the apex `osustocks.com`
+# points at this server (otherwise Caddy can't issue its cert).
 # osustocks.com {
 #     redir https://app.osustocks.com{uri}
 # }

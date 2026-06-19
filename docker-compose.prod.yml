@@ -85,6 +85,25 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  web:
+    # Builds the Next.js frontend from the sibling clone on the server
+    # (git clone OsuStocks.Web next to OsuStocks.API).
+    build:
+      context: ../OsuStocks.Web
+      args:
+        # NEXT_PUBLIC_* are inlined into the client bundle at build time.
+        NEXT_PUBLIC_API_BASE_URL: https://app.osustocks.com
+        NEXT_PUBLIC_SITE_URL: https://app.osustocks.com
+        PORT: "3000"
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Server-only proxy target for /api/v1/* — kept internal so API traffic stays on
+      # the Docker network and the browser only ever talks to its own origin (no CORS).
+      API_PROXY_TARGET: "http://api:8080"
+    depends_on: [api]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
