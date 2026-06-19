@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 
@@ -36,7 +37,21 @@ public static class ObservabilityExtensions
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {
-                    metrics.AddOtlpExporter(options => options.Endpoint = new Uri(otlpEndpoint));
+                    // Prometheus' OTLP receiver lives at <base>/api/v1/otlp and expects the per-signal
+                    // path /v1/metrics. Because we set Endpoint in code, the SDK does NOT auto-append
+                    // that path (it only does so for a bare OTEL_EXPORTER_OTLP_ENDPOINT env var), so we
+                    // append it ourselves — otherwise the push 404s and no metrics are ingested. The
+                    // receiver is HTTP/protobuf only, so pin the protocol regardless of env.
+                    var metricsEndpoint =
+                        otlpEndpoint.Contains("/v1/metrics", StringComparison.OrdinalIgnoreCase)
+                            ? otlpEndpoint
+                            : otlpEndpoint.TrimEnd('/') + "/v1/metrics";
+
+                    metrics.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = new Uri(metricsEndpoint);
+                        options.Protocol = OtlpExportProtocol.HttpProtobuf;
+                    });
                 }
             });
 
