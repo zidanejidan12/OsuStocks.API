@@ -248,6 +248,17 @@ public sealed class SynchronizationWorkerIntegrationTests
 
             return Task.FromResult<IReadOnlyList<OsuUserProfile>>(items);
         }
+
+        public Task<IReadOnlyList<OsuUserProfile>> GetPerformanceRankingsAsync(
+            int page,
+            string accessToken,
+            CancellationToken cancellationToken = default)
+        {
+            var ranking = page <= 1
+                ? users.Values.OrderBy(x => x.GlobalRank ?? int.MaxValue).ToList()
+                : [];
+            return Task.FromResult<IReadOnlyList<OsuUserProfile>>(ranking);
+        }
     }
 
     private sealed class InMemoryPlayerSnapshotRepository : IPlayerSnapshotRepository

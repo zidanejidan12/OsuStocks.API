@@ -80,4 +80,14 @@ internal sealed class FakeOsuApiClient : IOsuApiClient
 
         return Task.FromResult<IReadOnlyList<OsuUserProfile>>(users);
     }
+
+    public Task<IReadOnlyList<OsuUserProfile>> GetPerformanceRankingsAsync(
+        int page,
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        // Single page of the canned users; further pages are empty (end of leaderboard).
+        var ranking = page <= 1 ? Users : [];
+        return Task.FromResult(ranking);
+    }
 }

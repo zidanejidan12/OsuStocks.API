@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Hangfire;
 using MediatR;
 using OsuStocks.Api.Common;
 using OsuStocks.Application.Features.Admin.MarketSettings.GetMarketSettings;
@@ -10,6 +11,7 @@ using OsuStocks.Application.Features.PlayerRegistry.EnableTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.ListTrackedPlayers;
 using OsuStocks.Application.Features.PlayerRegistry.SearchOsuPlayers;
 using OsuStocks.Domain.Common.Enums;
+using OsuStocks.Infrastructure.BackgroundJobs;
 using static OsuStocks.Api.Common.EndpointAuth;
 
 namespace OsuStocks.Api.Endpoints;
@@ -138,6 +140,24 @@ internal static class AdminEndpoints
                 avatarUrl = result.Value.AvatarUrl,
                 stockId = result.Value.StockId
             });
+        });
+
+        // Bulk-seed the current top-N osu! players as tracked stocks. Long-running, so it is
+        // enqueued as a Hangfire job (executed on the worker) and returns 202 immediately.
+        // Idempotent — already-tracked players are skipped, so it doubles as a "refresh latest".
+        trackedPlayersGroup.MapPost("/seed", (
+            int? count,
+            ClaimsPrincipal principal,
+            IBackgroundJobClient backgroundJobs) =>
+        {
+            var actor = ResolveActor(principal);
+            var requested = Math.Clamp(count ?? 5000, 1, 10_000);
+
+            var jobId = backgroundJobs.Enqueue<SeedTrackedPlayersJob>(job => job.RunAsync(requested, actor));
+
+            return Results.Accepted(
+                "/api/v1/admin/tracked-players",
+                new { jobId, count = requested, status = "queued" });
         });
 
         trackedPlayersGroup.MapPatch("/{id:guid}/enable", async (
