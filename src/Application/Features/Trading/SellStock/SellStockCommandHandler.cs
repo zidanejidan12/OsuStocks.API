@@ -2,10 +2,12 @@ using MediatR;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Application.Features.Market.Notifications;
+using OsuStocks.Application.Features.Market.Services;
 using OsuStocks.Application.Features.Trading.Services;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Market.Events;
+using OsuStocks.Domain.Market.Models;
 using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Application.Features.Trading.SellStock;
@@ -20,6 +22,7 @@ public sealed class SellStockCommandHandler(
     IWalletTransactionRepository walletTransactionRepository,
     IApplicationDbContext dbContext,
     IPublisher publisher,
+    IMarketEventProcessingService marketEventProcessingService,
     ITradingGuardService tradingGuardService)
     : IRequestHandler<SellStockCommand, Result<SellStockResponse>>
 {
@@ -68,7 +71,14 @@ public sealed class SellStockCommandHandler(
         }
 
         var executedAt = DateTimeOffset.UtcNow;
-        var unitPrice = stock.CurrentPrice;
+
+        // Move the price for this order and stage the change in THIS transaction. The seller receives
+        // the AVERAGE of the pre- and post-trade price (slippage), so a large dump can't be sold in
+        // full at the high pre-dump price — closing the pump-and-dump loophole. Per-order impact is
+        // capped in the engine, and the price floor still applies.
+        var priceChange = await marketEventProcessingService.ApplyAndStageAsync(
+            stock, MarketPriceInput.Sell(request.Quantity), executedAt, cancellationToken);
+        var unitPrice = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
         var totalAmount = unitPrice * request.Quantity;
 
         holding.Quantity -= request.Quantity;
@@ -117,6 +127,7 @@ public sealed class SellStockCommandHandler(
 
         await publisher.Publish(new SellOrderExecutedNotification(
             new SellOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, executedAt)), cancellationToken);
+        await publisher.Publish(new PriceChangedNotification(priceChange), cancellationToken);
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 

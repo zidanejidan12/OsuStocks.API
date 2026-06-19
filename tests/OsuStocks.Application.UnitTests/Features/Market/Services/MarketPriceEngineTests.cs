@@ -19,7 +19,8 @@ public sealed class MarketPriceEngineTests
         InactivityDecayImpact: 0.50m,
         PriceFloor: 1m,
         RankChangeImpactScale: 0.5m,
-        MaxRankChangeImpact: 0.05m);
+        MaxRankChangeImpact: 0.05m,
+        MaxTradeImpact: 0.10m);
 
     [Fact]
     public void Calculate_BuyOrder_IncreasesPriceUsingConfiguredCoefficient()
@@ -29,6 +30,26 @@ public sealed class MarketPriceEngineTests
         Assert.Equal(100m, result.PreviousPrice);
         Assert.Equal(102m, result.NewPrice);
         Assert.Equal(0.02m, result.PercentageChange);
+    }
+
+    [Fact]
+    public void Calculate_BuyOrder_RespectsMaxTradeImpactCap()
+    {
+        // 20 shares * 0.01 = 0.20 impact, capped to MaxTradeImpact 0.10. Stops a single buy mooning a stock.
+        var result = _engine.Calculate(100m, MarketPriceInput.Buy(20), Coefficients);
+
+        Assert.Equal(0.10m, result.PercentageChange);
+        Assert.Equal(110m, result.NewPrice);
+    }
+
+    [Fact]
+    public void Calculate_SellOrder_RespectsMaxTradeImpactCap()
+    {
+        // 10 shares * 0.02 = 0.20 impact, capped to -0.10. Stops a single dump crashing a stock to the floor.
+        var result = _engine.Calculate(100m, MarketPriceInput.Sell(10), Coefficients);
+
+        Assert.Equal(-0.10m, result.PercentageChange);
+        Assert.Equal(90m, result.NewPrice);
     }
 
     [Fact]

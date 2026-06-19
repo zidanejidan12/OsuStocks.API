@@ -46,11 +46,11 @@ public sealed class MarketEventProcessingService(
         return await ApplyInternalAsync(stock, input, occurredAt, cancellationToken);
     }
 
-    private async Task<PriceChanged> ApplyInternalAsync(
+    public async Task<PriceChanged> ApplyAndStageAsync(
         PlayerStock stock,
         MarketPriceInput input,
         DateTimeOffset occurredAt,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var coefficients = await coefficientsProvider.GetCurrentAsync(cancellationToken);
         var calculation = marketPriceEngine.Calculate(stock.CurrentPrice, input, coefficients);
@@ -72,9 +72,18 @@ public sealed class MarketEventProcessingService(
             CreatedAt = occurredAt
         }, cancellationToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-
         return new PriceChanged(stock.Id, calculation.PreviousPrice, calculation.NewPrice, reason, occurredAt);
+    }
+
+    private async Task<PriceChanged> ApplyInternalAsync(
+        PlayerStock stock,
+        MarketPriceInput input,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        var priceChanged = await ApplyAndStageAsync(stock, input, occurredAt, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return priceChanged;
     }
 
     private static PriceChangeReason ResolveReason(MarketInputType type)

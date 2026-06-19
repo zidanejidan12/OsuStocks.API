@@ -11,4 +11,5 @@ public sealed record MarketPricingCoefficients(
     decimal InactivityDecayImpact,
     decimal PriceFloor,
     decimal RankChangeImpactScale,
-    decimal MaxRankChangeImpact);
+    decimal MaxRankChangeImpact,
+    decimal MaxTradeImpact);

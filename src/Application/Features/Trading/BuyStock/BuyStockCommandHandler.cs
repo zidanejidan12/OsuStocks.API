@@ -2,10 +2,12 @@ using MediatR;
 using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Application.Features.Market.Notifications;
+using OsuStocks.Application.Features.Market.Services;
 using OsuStocks.Application.Features.Trading.Services;
 using OsuStocks.Domain.Common.Enums;
 using OsuStocks.Domain.Entities;
 using OsuStocks.Domain.Market.Events;
+using OsuStocks.Domain.Market.Models;
 using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Application.Features.Trading.BuyStock;
@@ -21,6 +23,7 @@ public sealed class BuyStockCommandHandler(
     IWalletTransactionRepository walletTransactionRepository,
     IApplicationDbContext dbContext,
     IPublisher publisher,
+    IMarketEventProcessingService marketEventProcessingService,
     ITradingGuardService tradingGuardService)
     : IRequestHandler<BuyStockCommand, Result<BuyStockResponse>>
 {
@@ -80,11 +83,19 @@ public sealed class BuyStockCommandHandler(
         }
 
         var executedAt = DateTimeOffset.UtcNow;
-        var unitPrice = stock.CurrentPrice;
+
+        // Move the price for this order and stage the change in THIS transaction (committed by the
+        // SaveChanges below). The buyer pays the AVERAGE of the pre- and post-trade price (slippage),
+        // so an order can't fill at the old price and then profit from the pump it just created — this
+        // is what closes the pump-and-dump loophole. The per-order impact is capped in the engine.
+        var priceChange = await marketEventProcessingService.ApplyAndStageAsync(
+            stock, MarketPriceInput.Buy(request.Quantity), executedAt, cancellationToken);
+        var unitPrice = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
         var totalAmount = unitPrice * request.Quantity;
 
         if (wallet.Balance < totalAmount)
         {
+            // Nothing has been saved yet, so the staged price move is discarded with the scope.
             return Result.Failure<BuyStockResponse>("INSUFFICIENT_BALANCE", "Wallet balance is insufficient.");
         }
 
@@ -152,6 +163,7 @@ public sealed class BuyStockCommandHandler(
 
         await publisher.Publish(new BuyOrderExecutedNotification(
             new BuyOrderExecuted(request.UserId, stock.Id, request.Quantity, unitPrice, executedAt)), cancellationToken);
+        await publisher.Publish(new PriceChangedNotification(priceChange), cancellationToken);
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 

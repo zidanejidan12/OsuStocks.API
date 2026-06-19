@@ -104,7 +104,9 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
             // own ledger entry. Assert the trade entry specifically and account for reward credits.
             var buyLedgerEntry = Assert.Single(
                 walletTransactionsAfterBuy, x => x.TransactionType == WalletTransactionType.BuyStock);
-            Assert.Equal(1000m, buyLedgerEntry.Amount);
+            // 500 sh @ price 2: impact 0.0025*500 = 1.25 capped to 0.10 -> price 2.00 -> 2.20.
+            // Average-fill slippage charges the midpoint 2.10, so 500 * 2.10 = 1050.
+            Assert.Equal(1050m, buyLedgerEntry.Amount);
 
             rewardCreditsAfterBuy = walletTransactionsAfterBuy
                 .Where(x => x.TransactionType is WalletTransactionType.AchievementReward
@@ -112,7 +114,7 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
                 .Sum(x => x.Amount);
         }
 
-        Assert.Equal(1_000_000m - 1000m + rewardCreditsAfterBuy, walletAfterBuyBalance);
+        Assert.Equal(1_000_000m - 1050m + rewardCreditsAfterBuy, walletAfterBuyBalance);
 
         var sellResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/sell",
@@ -151,6 +153,10 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
 
             var buyTrade = trades.Single(x => x.TradeType == TradeType.Buy);
             var sellTrade = trades.Single(x => x.TradeType == TradeType.Sell);
+
+            // Anti-exploit: average-fill slippage makes an immediate buy->sell round trip a net loss,
+            // so a user can never profit from the price pump their own buy creates (pump-and-dump).
+            Assert.True(buyTrade.TotalAmount > sellTrade.TotalAmount);
 
             var ledgerAfterSell = await dbContext.WalletTransactions
                 .AsNoTracking()
