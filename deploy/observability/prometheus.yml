@@ -1,0 +1,25 @@
+# Prometheus config. The API/Worker PUSH their app metrics via the OTLP receiver
+# (enabled with --web.enable-otlp-receiver), so there is no scrape job for them.
+# Prometheus SCRAPES the infra exporters below.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+# Promote OTLP resource attributes to labels so dashboards can split by service.
+otlp:
+  promote_resource_attributes:
+    - service.name
+    - service.instance.id
+
+scrape_configs:
+  - job_name: node            # host CPU / RAM / disk / network
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: postgres        # connections, tx rate, cache hit, locks, db size
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: redis           # memory, ops/sec, keyspace, hit rate
+    static_configs:
+      - targets: ["redis-exporter:9121"]
