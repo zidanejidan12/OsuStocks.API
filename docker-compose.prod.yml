@@ -91,9 +91,13 @@ services:
     build:
       context: ../OsuStocks.Web
       args:
-        # NEXT_PUBLIC_* are inlined into the client bundle at build time.
-        NEXT_PUBLIC_API_BASE_URL: https://app.osustocks.com
+        # Browser API base: EMPTY so the client uses same-origin /api/v1/* (proxied
+        # server-side). Must NOT be the public origin, or it becomes the proxy
+        # fallback target and the /api/v1 rewrite loops back through Caddy.
+        NEXT_PUBLIC_API_BASE_URL: ""
         NEXT_PUBLIC_SITE_URL: https://app.osustocks.com
+        # Server-side proxy target — baked into the Next.js rewrite at build time.
+        API_PROXY_TARGET: "http://api:8080"
         PORT: "3000"
     restart: unless-stopped
     environment:
