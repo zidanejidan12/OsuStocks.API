@@ -65,6 +65,7 @@ docker run --rm --network osustocks_default -v "$PWD":/src -w /src \
   -e ConnectionStrings__Postgres="Host=postgres;Port=5432;Database=osu_stocks;Username=osu_stocks;Password=$POSTGRES_PASSWORD" \
   mcr.microsoft.com/dotnet/sdk:9.0 bash -lc \
   "dotnet tool install --global dotnet-ef >/dev/null 2>&1; export PATH=\$PATH:/root/.dotnet/tools; \
+   dotnet restore && \
    dotnet ef database update --project src/Infrastructure/OsuStocks.Infrastructure.csproj \
    --startup-project src/Api/OsuStocks.Api.csproj"
 ```
