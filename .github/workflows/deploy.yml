@@ -1,0 +1,49 @@
+name: Deploy (prod)
+
+# Manual deploy: GitHub → Actions → "Deploy (prod)" → Run workflow.
+# SSHes into the Hetzner box and runs deploy/deploy.sh, which pulls both repos,
+# rebuilds api/worker/web, brings the stack up, and health-checks /health.
+#
+# Requires repo secrets:
+#   SSH_HOST          server IP / hostname
+#   SSH_USER          deploy user (e.g. "deploy")
+#   SSH_PRIVATE_KEY   private key authorized for SSH_USER on the box
+on:
+  workflow_dispatch:
+    inputs:
+      migrate:
+        description: "Apply EF migrations (only tick when a merged PR added one)"
+        type: boolean
+        default: false
+      caddy:
+        description: "Force-recreate Caddy (only after editing deploy/Caddyfile)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run deploy script on server
+        env:
+          MIGRATE: ${{ inputs.migrate }}
+          CADDY: ${{ inputs.caddy }}
+        run: |
+          FLAGS=""
+          [ "$MIGRATE" = "true" ] && FLAGS="$FLAGS --migrate"
+          [ "$CADDY" = "true" ] && FLAGS="$FLAGS --caddy"
+          echo "Deploying with flags:${FLAGS:- (none)}"
+          ssh -i ~/.ssh/id_ed25519 \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd ~/OsuStocks.API && ./deploy/deploy.sh${FLAGS}"
