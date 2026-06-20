@@ -10,4 +10,5 @@ public sealed record StockAnalyticsReadModel(
     int ActiveTraders24h,
     decimal MarketCap,
     decimal Liquidity,
-    string LiquidityTier);
+    string LiquidityTier,
+    decimal TotalShares);

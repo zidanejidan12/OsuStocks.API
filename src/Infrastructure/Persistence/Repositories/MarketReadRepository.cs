@@ -288,11 +288,13 @@ ORDER BY o.bucket_start ASC;";
             .Distinct()
             .CountAsync(cancellationToken);
 
-        var totalHeldShares = (long)Math.Round(await dbContext.Holdings
+        // Raw decimal sum (fractional shares to 2dp) — kept exact so the frontend can compute the
+        // per-trader ownership cap precisely; rounding would drift the suggested max-buy.
+        var totalHeldShares = await dbContext.Holdings
             .AsNoTracking()
             .Where(x => x.StockId == stockId && x.Quantity > 0)
             .Select(x => (decimal?)x.Quantity)
-            .SumAsync(cancellationToken) ?? 0m);
+            .SumAsync(cancellationToken) ?? 0m;
 
         var volatility = await GetVolatility7dAsync(stockId, cutoff7d, cancellationToken);
 
@@ -310,7 +312,8 @@ ORDER BY o.bucket_start ASC;";
             activeTraders24h,
             totalHeldShares * stock.CurrentPrice,
             liquidity,
-            liquidityTier);
+            liquidityTier,
+            totalHeldShares);
     }
 
     // Sample standard deviation of per-step simple returns over the 7d window. EF cannot translate
