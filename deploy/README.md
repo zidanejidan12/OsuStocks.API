@@ -87,6 +87,18 @@ or run `bash deploy/deploy.sh`.) The PR description says when `--migrate` is nee
 > No auto‑migrate on startup by design (api + worker would race). `--migrate` runs a
 > one‑off `dotnet/sdk:9.0` container; it's idempotent (applies only pending migrations).
 
+### One-click deploy from GitHub (optional)
+There's a **manual** GitHub Actions workflow (`.github/workflows/deploy.yml`):
+**Actions → "Deploy (prod)" → Run workflow**. It SSHes in and runs `deploy.sh` for
+you — same script, no SSH on your end. It does **not** fire on merge; you press the
+button. Tick **migrate** only when a merged PR added a migration (off by default), and
+**caddy** only after editing `deploy/Caddyfile`.
+
+Set these repo **Settings → Secrets and variables → Actions** secrets once:
+`SSH_HOST` (server IP), `SSH_USER` (`deploy`), `SSH_PRIVATE_KEY` (a key authorized for
+that user — generate a dedicated deploy key and add its public half to
+`~deploy/.ssh/authorized_keys`).
+
 ## Verify
 - `https://api.osustocks.com/health` → `200` (Postgres + Redis green). `/swagger` is off in prod.
 - `https://osustocks.com` loads the frontend; `https://app.osustocks.com` 301s to it.
