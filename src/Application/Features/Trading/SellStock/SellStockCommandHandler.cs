@@ -154,6 +154,6 @@ public sealed class SellStockCommandHandler(
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
-        return Result.Success(new SellStockResponse(trade.Id, unitPrice, totalAmount, fee));
+        return Result.Success(new SellStockResponse(trade.Id, trade.Quantity, unitPrice, totalAmount, fee));
     }
 }

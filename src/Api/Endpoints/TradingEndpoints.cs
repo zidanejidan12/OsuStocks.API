@@ -38,6 +38,7 @@ internal static class TradingEndpoints
             return Results.Ok(new
             {
                 tradeId = result.Value.TradeId,
+                quantity = result.Value.Quantity,
                 unitPrice = result.Value.UnitPrice,
                 totalAmount = result.Value.TotalAmount,
                 fee = result.Value.Fee,
@@ -67,6 +68,7 @@ internal static class TradingEndpoints
             return Results.Ok(new
             {
                 tradeId = result.Value.TradeId,
+                quantity = result.Value.Quantity,
                 unitPrice = result.Value.UnitPrice,
                 totalAmount = result.Value.TotalAmount,
                 fee = result.Value.Fee,
