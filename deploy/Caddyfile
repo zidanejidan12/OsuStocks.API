@@ -14,13 +14,14 @@ grafana.osustocks.com {
     reverse_proxy grafana:3000
 }
 
-# Frontend (OsuStocks.Web / Next.js) — the "web" container on this network.
-app.osustocks.com {
+# Frontend (OsuStocks.Web / Next.js) — served at the apex (canonical).
+# Requires an A record for the apex `osustocks.com` pointing at this server so
+# Caddy can issue its cert.
+osustocks.com {
     reverse_proxy web:3000
 }
 
-# Bare domain → app. Uncomment once an A record for the apex `osustocks.com`
-# points at this server (otherwise Caddy can't issue its cert).
-# osustocks.com {
-#     redir https://app.osustocks.com{uri}
-# }
+# Old subdomain → permanent redirect to the apex so there's one canonical URL.
+app.osustocks.com {
+    redir https://osustocks.com{uri} permanent
+}
