@@ -178,6 +178,9 @@ public sealed class TradingGuardServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("POSITION_LIMIT_EXCEEDED", result.Error!.Code);
+        // Message tells the user the exact max they can still buy:
+        // largest q with (10+q)/(60+q) <= 0.25  ->  (0.25*60 - 10)/0.75 = 6.66 (floored to 2dp).
+        Assert.Contains("6.66", result.Error.Message);
     }
 
     [Fact]
