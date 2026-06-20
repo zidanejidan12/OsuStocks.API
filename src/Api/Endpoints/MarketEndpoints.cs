@@ -257,7 +257,9 @@ internal static class MarketEndpoints
                 activeTraders24h = result.Value.ActiveTraders24h,
                 marketCap = result.Value.MarketCap,
                 liquidity = result.Value.Liquidity,
-                liquidityTier = result.Value.LiquidityTier
+                liquidityTier = result.Value.LiquidityTier,
+                totalShares = result.Value.TotalShares,
+                maxOwnershipPercentage = result.Value.MaxOwnershipPercentage
             });
         });
 

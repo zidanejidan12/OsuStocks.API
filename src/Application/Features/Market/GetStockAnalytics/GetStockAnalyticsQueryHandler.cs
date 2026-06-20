@@ -1,10 +1,13 @@
 using MediatR;
+using OsuStocks.Application.Common.Interfaces;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Application.Features.Market.GetStockAnalytics;
 
-public sealed class GetStockAnalyticsQueryHandler(IMarketReadRepository marketReadRepository)
+public sealed class GetStockAnalyticsQueryHandler(
+    IMarketReadRepository marketReadRepository,
+    IAntiAbuseSettings antiAbuseSettings)
     : IRequestHandler<GetStockAnalyticsQuery, Result<GetStockAnalyticsResponse>>
 {
     public async Task<Result<GetStockAnalyticsResponse>> Handle(
@@ -27,6 +30,8 @@ public sealed class GetStockAnalyticsQueryHandler(IMarketReadRepository marketRe
             analytics.ActiveTraders24h,
             analytics.MarketCap,
             analytics.Liquidity,
-            analytics.LiquidityTier));
+            analytics.LiquidityTier,
+            analytics.TotalShares,
+            antiAbuseSettings.MaxOwnershipPercentage));
     }
 }

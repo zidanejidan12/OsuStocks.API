@@ -154,7 +154,7 @@ internal sealed class InMemoryMarketReadRepository : IMarketReadRepository
         }
 
         return Task.FromResult<StockAnalyticsReadModel?>(
-            new StockAnalyticsReadModel(0L, 0m, 0L, 0m, 0m, 0, 0, 0m, 0m, "Thin"));
+            new StockAnalyticsReadModel(0L, 0m, 0L, 0m, 0m, 0, 0, 0m, 0m, "Thin", 0m));
     }
 
     private static MarketTopMoverReadModel ToTopMover(MarketStockDetailsReadModel stock)
