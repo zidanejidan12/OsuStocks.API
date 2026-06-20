@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OsuStocks.Infrastructure.Observability;
 
 namespace OsuStocks.Infrastructure.OsuIntegration.Telemetry;
 
@@ -19,6 +20,7 @@ public static class ObservabilityExtensions
         IConfiguration configuration)
     {
         services.AddSingleton<OsuApiTelemetry>();
+        services.AddSingleton<EconomyMetrics>();
 
         var otlpEndpoint =
             Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -34,6 +36,7 @@ public static class ObservabilityExtensions
             .WithMetrics(metrics =>
             {
                 metrics.AddMeter(OsuApiTelemetry.MeterName);
+                metrics.AddMeter(EconomyMetrics.MeterName);
 
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {

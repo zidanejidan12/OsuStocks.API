@@ -84,6 +84,7 @@ public static class DependencyInjection
         services.AddScoped<IUserMissionCompletionRepository, UserMissionCompletionRepository>();
         services.AddScoped<IProgressionMetricsReadRepository, ProgressionMetricsReadRepository>();
         services.AddScoped<IDailyLoginRewardRepository, DailyLoginRewardRepository>();
+        services.AddScoped<IEconomyReadRepository, EconomyReadRepository>();
 
         services.AddScoped<IMarketCoefficientsProvider, MarketCoefficientsProvider>();
         services.AddSingleton<IInactivityDecaySettings, InactivityDecaySettings>();
@@ -113,6 +114,7 @@ public static class DependencyInjection
         services.AddScoped<WealthSnapshotRecurringJob>();
         services.AddScoped<SnapshotRetentionRecurringJob>();
         services.AddScoped<MarketHistoryRetentionRecurringJob>();
+        services.AddScoped<EconomyMetricsRecurringJob>();
         services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
 
         services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();

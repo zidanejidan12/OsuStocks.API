@@ -164,6 +164,27 @@ services:
       REDIS_ADDR: "redis://redis:6379"
     depends_on: [redis]
 
+  # Nightly pg_dump with rotation, into the postgres_backups volume. Image major
+  # version must match postgres (16) so pg_dump is compatible. Restore example:
+  #   gunzip -c /backups/last/osu_stocks-latest.sql.gz | psql -U osu_stocks -d osu_stocks
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: osu_stocks
+      POSTGRES_USER: osu_stocks
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      SCHEDULE: "@daily"            # nightly
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
+      POSTGRES_EXTRA_OPTS: "--clean --if-exists"
+    volumes:
+      - postgres_backups:/backups
+    depends_on:
+      postgres: { condition: service_healthy }
+
 volumes:
   postgres_data:
   postgres_backups:

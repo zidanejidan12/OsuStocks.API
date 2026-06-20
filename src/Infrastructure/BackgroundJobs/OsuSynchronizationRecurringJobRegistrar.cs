@@ -55,5 +55,13 @@ public sealed class OsuSynchronizationRecurringJobRegistrar(IRecurringJobManager
             "wealth-snapshot",
             job => job.RunAsync(),
             Cron.Daily(2, 30));
+
+        // Refresh the economy/inflation gauges (circulating / minted / burned) every 10 minutes, and
+        // trigger once now so the gauges (and the meter) come up immediately rather than on the next tick.
+        recurringJobManager.AddOrUpdate<EconomyMetricsRecurringJob>(
+            "economy-metrics",
+            job => job.RunAsync(),
+            "*/10 * * * *");
+        recurringJobManager.Trigger("economy-metrics");
     }
 }
