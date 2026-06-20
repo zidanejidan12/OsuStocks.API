@@ -190,6 +190,6 @@ public sealed class BuyStockCommandHandler(
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
-        return Result.Success(new BuyStockResponse(trade.Id, unitPrice, totalAmount, fee));
+        return Result.Success(new BuyStockResponse(trade.Id, trade.Quantity, unitPrice, totalAmount, fee));
     }
 }
