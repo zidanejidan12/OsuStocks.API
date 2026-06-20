@@ -24,6 +24,7 @@ public sealed class SellStockCommandHandler(
     IPublisher publisher,
     IMarketEventProcessingService marketEventProcessingService,
     ITradeFeePolicy tradeFeePolicy,
+    ILiquidityProvider liquidityProvider,
     ITradingGuardService tradingGuardService)
     : IRequestHandler<SellStockCommand, Result<SellStockResponse>>
 {
@@ -73,13 +74,17 @@ public sealed class SellStockCommandHandler(
 
         var executedAt = DateTimeOffset.UtcNow;
 
-        // Move the price for this order and stage the change in THIS transaction. The seller receives
-        // the AVERAGE of the pre- and post-trade price (slippage), so a large dump can't be sold in
-        // full at the high pre-dump price — closing the pump-and-dump loophole. Per-order impact is
-        // capped in the engine, and the price floor still applies.
-        var priceChange = await marketEventProcessingService.ApplyAndStageAsync(
-            stock, MarketPriceInput.Sell(request.Quantity), executedAt, cancellationToken);
-        var unitPrice = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
+        // Liquidity (float + recent volume) dampens both the price impact and the spread: deep stocks
+        // barely move, thin stocks swing. Move the price + stage it in THIS transaction.
+        var liquidity = await liquidityProvider.GetLiquidityAsync(stock.Id, cancellationToken);
+        var staged = await marketEventProcessingService.ApplyAndStageAsync(
+            stock, MarketPriceInput.Sell(request.Quantity, liquidity), executedAt, cancellationToken);
+        var priceChange = staged.PriceChange;
+
+        // Fill at the AVERAGE of the pre/post price (slippage) MINUS half the bid/ask spread on the
+        // sell side. Slippage kills the dump-into-your-own-pump round trip; the spread is the liquidity cost.
+        var mid = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
+        var unitPrice = mid * (1m - staged.SpreadRate / 2m);
         var totalAmount = unitPrice * request.Quantity;
 
         // Progressive service fee, deducted from the proceeds and burned (inflation sink).

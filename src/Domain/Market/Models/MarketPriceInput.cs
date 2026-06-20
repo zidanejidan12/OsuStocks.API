@@ -7,10 +7,15 @@ public sealed record MarketPriceInput(
     decimal CurrentPp = 0m,
     decimal TopPlayPp = 0m,
     int PreviousRank = 0,
-    int CurrentRank = 0)
+    int CurrentRank = 0,
+    // Stock liquidity (float + recent volume) at trade time. Higher liquidity dampens the price
+    // impact and the bid/ask spread of a trade — deep stocks move less, thin stocks swing more.
+    decimal Liquidity = 0m)
 {
-    public static MarketPriceInput Buy(decimal quantity) => new(MarketInputType.BuyOrderExecuted, quantity);
-    public static MarketPriceInput Sell(decimal quantity) => new(MarketInputType.SellOrderExecuted, quantity);
+    public static MarketPriceInput Buy(decimal quantity, decimal liquidity = 0m)
+        => new(MarketInputType.BuyOrderExecuted, quantity, Liquidity: liquidity);
+    public static MarketPriceInput Sell(decimal quantity, decimal liquidity = 0m)
+        => new(MarketInputType.SellOrderExecuted, quantity, Liquidity: liquidity);
 
     // CurrentPp carries the player's overall pp; TopPlayPp the pp of the newly-set play. The engine
     // scales the price bump by playPp / playerPp so breakout plays move the stock more than the same

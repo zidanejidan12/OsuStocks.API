@@ -30,6 +30,19 @@ internal sealed class TradeReadRepository(AppDbContext dbContext) : ITradeReadRe
                 x.Stock.TrackedPlayer.AvatarUrl))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<decimal> GetSharesTradedSinceAsync(
+        Guid stockId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        // Uses ix_trade_stock_executed (stock_id, executed_at).
+        return await dbContext.Trades
+            .AsNoTracking()
+            .Where(x => x.StockId == stockId && x.ExecutedAt >= since)
+            .Select(x => (decimal?)x.Quantity)
+            .SumAsync(cancellationToken) ?? 0m;
+    }
 }
 
 

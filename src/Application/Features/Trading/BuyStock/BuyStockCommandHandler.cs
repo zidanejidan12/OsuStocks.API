@@ -25,6 +25,7 @@ public sealed class BuyStockCommandHandler(
     IPublisher publisher,
     IMarketEventProcessingService marketEventProcessingService,
     ITradeFeePolicy tradeFeePolicy,
+    ILiquidityProvider liquidityProvider,
     ITradingGuardService tradingGuardService)
     : IRequestHandler<BuyStockCommand, Result<BuyStockResponse>>
 {
@@ -85,13 +86,17 @@ public sealed class BuyStockCommandHandler(
 
         var executedAt = DateTimeOffset.UtcNow;
 
-        // Move the price for this order and stage the change in THIS transaction (committed by the
-        // SaveChanges below). The buyer pays the AVERAGE of the pre- and post-trade price (slippage),
-        // so an order can't fill at the old price and then profit from the pump it just created — this
-        // is what closes the pump-and-dump loophole. The per-order impact is capped in the engine.
-        var priceChange = await marketEventProcessingService.ApplyAndStageAsync(
-            stock, MarketPriceInput.Buy(request.Quantity), executedAt, cancellationToken);
-        var unitPrice = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
+        // Liquidity (float + recent volume) dampens both the price impact and the spread: deep stocks
+        // barely move, thin stocks swing. Move the price + stage it in THIS transaction.
+        var liquidity = await liquidityProvider.GetLiquidityAsync(stock.Id, cancellationToken);
+        var staged = await marketEventProcessingService.ApplyAndStageAsync(
+            stock, MarketPriceInput.Buy(request.Quantity, liquidity), executedAt, cancellationToken);
+        var priceChange = staged.PriceChange;
+
+        // Fill at the AVERAGE of the pre/post price (slippage) plus half the bid/ask spread on the buy
+        // side. Slippage kills the pump-and-dump round trip; the spread is the liquidity cost of trading.
+        var mid = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
+        var unitPrice = mid * (1m + staged.SpreadRate / 2m);
         var totalAmount = unitPrice * request.Quantity;
 
         // Progressive service fee, charged on top of the purchase and burned (inflation sink).

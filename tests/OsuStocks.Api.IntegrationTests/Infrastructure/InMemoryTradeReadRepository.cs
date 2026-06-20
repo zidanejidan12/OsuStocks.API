@@ -38,4 +38,10 @@ internal sealed class InMemoryTradeReadRepository(
 
         return items;
     }
+
+    public Task<decimal> GetSharesTradedSinceAsync(
+        Guid stockId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+        => tradeRepository.SumQuantityByStockSinceAsync(stockId, since, cancellationToken);
 }

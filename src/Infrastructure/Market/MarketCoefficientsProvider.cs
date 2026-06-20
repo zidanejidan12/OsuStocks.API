@@ -31,6 +31,10 @@ internal sealed class MarketCoefficientsProvider(
             value.PriceFloor <= 0m ? 1m : value.PriceFloor,
             value.RankChangeImpactScale * ppMultiplier,
             value.MaxRankChangeImpact * ppMultiplier,
-            value.MaxTradeImpact);
+            value.MaxTradeImpact,
+            // Liquidity coefficients are structural (not scaled by the admin multipliers).
+            value.ReferenceLiquidityDepth,
+            value.SpreadBaseRate,
+            value.SpreadMinRate);
     }
 }
