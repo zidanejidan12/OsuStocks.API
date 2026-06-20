@@ -90,6 +90,8 @@ public static class DependencyInjection
         services.AddSingleton<IAntiAbuseSettings, AntiAbuseSettings>();
         services.AddSingleton<IDailyRewardSettings, DailyRewardSettings>();
         services.AddScoped<ITradingGuardService, TradingGuardService>();
+        services.AddScoped<ITradeFeePolicy, TradeFeePolicy>();
+        services.AddScoped<ILiquidityProvider, LiquidityProvider>();
         services.AddScoped<IDailyLoginRewardService, DailyLoginRewardService>();
         services.AddScoped<IMarketPriceEngine, OsuStocks.Domain.Market.Services.MarketPriceEngine>();
         services.AddSingleton<OsuStocks.Domain.Investor.Interfaces.IInvestorLevelCalculator,

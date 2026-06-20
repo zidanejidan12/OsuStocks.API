@@ -12,14 +12,21 @@ public sealed class MarketPriceEngine : IMarketPriceEngine
     {
         var basePrice = currentPrice <= 0m ? coefficients.PriceFloor : currentPrice;
 
+        // Liquidity dampening: deep stocks absorb orders with little price impact, thin stocks swing.
+        // factor = refDepth / (liquidity + refDepth) ∈ (0,1]; ≈1 for a fresh/illiquid stock, →0 as it
+        // gets deep. Applied to both the trade impact and the bid/ask spread below.
+        var liquidityFactor = coefficients.ReferenceLiquidityDepth <= 0m
+            ? 1m
+            : coefficients.ReferenceLiquidityDepth / (Math.Max(0m, input.Liquidity) + coefficients.ReferenceLiquidityDepth);
+
         var percentageChange = input.Type switch
         {
-            // Trade impact is capped per order (both directions) so a single large buy/sell can't moon
-            // or crash a stock — closing the pump-and-dump vector. Other drivers clamp inside their helpers.
+            // Trade impact is liquidity-scaled and capped per order (both directions) so a single large
+            // buy/sell can't moon or crash a stock. Other drivers clamp inside their helpers.
             MarketInputType.BuyOrderExecuted =>
-                Math.Clamp(coefficients.TradeBuyImpactPerShare * input.Quantity, 0m, coefficients.MaxTradeImpact),
+                Math.Clamp(coefficients.TradeBuyImpactPerShare * input.Quantity * liquidityFactor, 0m, coefficients.MaxTradeImpact),
             MarketInputType.SellOrderExecuted =>
-                Math.Clamp(-coefficients.TradeSellImpactPerShare * input.Quantity, -coefficients.MaxTradeImpact, 0m),
+                Math.Clamp(-coefficients.TradeSellImpactPerShare * input.Quantity * liquidityFactor, -coefficients.MaxTradeImpact, 0m),
             MarketInputType.TopPlayDetected => CalculateTopPlayImpact(input, coefficients),
             MarketInputType.PpIncreased => CalculatePpImpact(input, coefficients),
             MarketInputType.RankChanged => CalculateRankChangeImpact(input, coefficients),
@@ -27,10 +34,16 @@ public sealed class MarketPriceEngine : IMarketPriceEngine
             _ => 0m
         };
 
+        // Bid/ask spread only applies to trades; thin stocks get the full SpreadBaseRate, deep stocks
+        // converge to the SpreadMinRate floor.
+        var spreadRate = input.Type is MarketInputType.BuyOrderExecuted or MarketInputType.SellOrderExecuted
+            ? Math.Max(coefficients.SpreadMinRate, coefficients.SpreadBaseRate * liquidityFactor)
+            : 0m;
+
         var rawPrice = basePrice * (1m + percentageChange);
         var newPrice = rawPrice < coefficients.PriceFloor ? coefficients.PriceFloor : rawPrice;
 
-        return new MarketPriceCalculation(basePrice, decimal.Round(newPrice, 4), percentageChange);
+        return new MarketPriceCalculation(basePrice, decimal.Round(newPrice, 4), percentageChange, spreadRate);
     }
 
     private static decimal CalculateTopPlayImpact(MarketPriceInput input, MarketPricingCoefficients coefficients)

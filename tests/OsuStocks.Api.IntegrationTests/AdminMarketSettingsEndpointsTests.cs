@@ -22,6 +22,7 @@ public sealed class AdminMarketSettingsEndpointsTests
         Assert.Equal(1m, payload.PpMultiplier);
         Assert.Equal(1m, payload.TradeMultiplier);
         Assert.Equal(1m, payload.DecayMultiplier);
+        Assert.Equal(1m, payload.TradeFeeMultiplier);
         Assert.False(payload.IsMaintenanceMode);
     }
 
@@ -33,7 +34,7 @@ public sealed class AdminMarketSettingsEndpointsTests
 
         var updateResponse = await client.PutAsJsonAsync(
             "/api/v1/admin/market-settings",
-            new UpdateMarketSettingsRequest(1.5m, 1.2m, 0.5m, true));
+            new UpdateMarketSettingsRequest(1.5m, 1.2m, 0.5m, 2m, true));
 
         Assert.Equal(HttpStatusCode.NoContent, updateResponse.StatusCode);
 
@@ -45,6 +46,7 @@ public sealed class AdminMarketSettingsEndpointsTests
         Assert.Equal(1.5m, payload.PpMultiplier);
         Assert.Equal(1.2m, payload.TradeMultiplier);
         Assert.Equal(0.5m, payload.DecayMultiplier);
+        Assert.Equal(2m, payload.TradeFeeMultiplier);
         Assert.True(payload.IsMaintenanceMode);
     }
 
@@ -56,7 +58,7 @@ public sealed class AdminMarketSettingsEndpointsTests
 
         var response = await client.PutAsJsonAsync(
             "/api/v1/admin/market-settings",
-            new UpdateMarketSettingsRequest(-0.1m, 1m, 1m, false));
+            new UpdateMarketSettingsRequest(-0.1m, 1m, 1m, 1m, false));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -65,12 +67,13 @@ public sealed class AdminMarketSettingsEndpointsTests
         Assert.Equal("VALIDATION_ERROR", payload.Code);
     }
 
-    private sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier, bool IsMaintenanceMode);
+    private sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier, decimal TradeFeeMultiplier, bool IsMaintenanceMode);
 
     private sealed record MarketSettingsResponse(
         [property: JsonPropertyName("ppMultiplier")] decimal PpMultiplier,
         [property: JsonPropertyName("tradeMultiplier")] decimal TradeMultiplier,
         [property: JsonPropertyName("decayMultiplier")] decimal DecayMultiplier,
+        [property: JsonPropertyName("tradeFeeMultiplier")] decimal TradeFeeMultiplier,
         [property: JsonPropertyName("isMaintenanceMode")] bool IsMaintenanceMode);
 
     private sealed record ErrorResponse(

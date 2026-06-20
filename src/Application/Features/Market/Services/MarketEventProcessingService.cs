@@ -46,7 +46,7 @@ public sealed class MarketEventProcessingService(
         return await ApplyInternalAsync(stock, input, occurredAt, cancellationToken);
     }
 
-    public async Task<PriceChanged> ApplyAndStageAsync(
+    public async Task<StagedPriceResult> ApplyAndStageAsync(
         PlayerStock stock,
         MarketPriceInput input,
         DateTimeOffset occurredAt,
@@ -72,7 +72,8 @@ public sealed class MarketEventProcessingService(
             CreatedAt = occurredAt
         }, cancellationToken);
 
-        return new PriceChanged(stock.Id, calculation.PreviousPrice, calculation.NewPrice, reason, occurredAt);
+        var priceChanged = new PriceChanged(stock.Id, calculation.PreviousPrice, calculation.NewPrice, reason, occurredAt);
+        return new StagedPriceResult(priceChanged, calculation.SpreadRate);
     }
 
     private async Task<PriceChanged> ApplyInternalAsync(
@@ -81,9 +82,9 @@ public sealed class MarketEventProcessingService(
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken)
     {
-        var priceChanged = await ApplyAndStageAsync(stock, input, occurredAt, cancellationToken);
+        var staged = await ApplyAndStageAsync(stock, input, occurredAt, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return priceChanged;
+        return staged.PriceChange;
     }
 
     private static PriceChangeReason ResolveReason(MarketInputType type)

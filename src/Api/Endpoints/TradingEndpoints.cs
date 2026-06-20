@@ -40,6 +40,8 @@ internal static class TradingEndpoints
                 tradeId = result.Value.TradeId,
                 unitPrice = result.Value.UnitPrice,
                 totalAmount = result.Value.TotalAmount,
+                fee = result.Value.Fee,
+                totalCost = result.Value.TotalAmount + result.Value.Fee,
                 status = "Completed"
             });
         });
@@ -67,6 +69,8 @@ internal static class TradingEndpoints
                 tradeId = result.Value.TradeId,
                 unitPrice = result.Value.UnitPrice,
                 totalAmount = result.Value.TotalAmount,
+                fee = result.Value.Fee,
+                netAmount = result.Value.TotalAmount - result.Value.Fee,
                 status = "Completed"
             });
         });

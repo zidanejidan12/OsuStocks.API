@@ -8,4 +8,6 @@ public sealed record GetStockAnalyticsResponse(
     decimal Volatility7d,
     int OwnershipCount,
     int ActiveTraders24h,
-    decimal MarketCap);
+    decimal MarketCap,
+    decimal Liquidity,
+    string LiquidityTier);

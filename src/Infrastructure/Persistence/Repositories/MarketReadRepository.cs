@@ -1,11 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using OsuStocks.Domain.Market.Services;
 using OsuStocks.Domain.Models.Market;
 using OsuStocks.Domain.Repositories;
+using OsuStocks.Infrastructure.Market.Options;
 
 namespace OsuStocks.Infrastructure.Persistence.Repositories;
 
-internal sealed class MarketReadRepository(AppDbContext dbContext) : IMarketReadRepository
+internal sealed class MarketReadRepository(
+    AppDbContext dbContext,
+    IOptions<MarketEngineOptions> marketEngineOptions) : IMarketReadRepository
 {
     public async Task<MarketOverviewReadModel> GetOverviewAsync(CancellationToken cancellationToken = default)
     {
@@ -291,6 +296,10 @@ ORDER BY o.bucket_start ASC;";
 
         var volatility = await GetVolatility7dAsync(stockId, cutoff7d, cancellationToken);
 
+        var engine = marketEngineOptions.Value;
+        var liquidity = LiquidityCalculator.Liquidity(totalHeldShares, volume24hShares, engine.LiquidityVolumeWeight);
+        var liquidityTier = LiquidityCalculator.Tier(liquidity, engine.ReferenceLiquidityDepth);
+
         return new StockAnalyticsReadModel(
             volume24hShares,
             volume24hValue,
@@ -299,7 +308,9 @@ ORDER BY o.bucket_start ASC;";
             volatility,
             ownershipCount,
             activeTraders24h,
-            totalHeldShares * stock.CurrentPrice);
+            totalHeldShares * stock.CurrentPrice,
+            liquidity,
+            liquidityTier);
     }
 
     // Sample standard deviation of per-step simple returns over the 7d window. EF cannot translate

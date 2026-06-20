@@ -15,6 +15,9 @@ public sealed class UpdateMarketSettingsCommandValidator : AbstractValidator<Upd
         RuleFor(x => x.DecayMultiplier)
             .InclusiveBetween(0m, 10m);
 
+        RuleFor(x => x.TradeFeeMultiplier)
+            .InclusiveBetween(0m, 10m);
+
         RuleFor(x => x.Actor)
             .MaximumLength(100);
     }

@@ -40,6 +40,7 @@ internal static class AdminEndpoints
                 ppMultiplier = result.Value.PpMultiplier,
                 tradeMultiplier = result.Value.TradeMultiplier,
                 decayMultiplier = result.Value.DecayMultiplier,
+                tradeFeeMultiplier = result.Value.TradeFeeMultiplier,
                 isMaintenanceMode = result.Value.IsMaintenanceMode
             });
         });
@@ -57,6 +58,7 @@ internal static class AdminEndpoints
                     request.PpMultiplier,
                     request.TradeMultiplier,
                     request.DecayMultiplier,
+                    request.TradeFeeMultiplier,
                     request.IsMaintenanceMode,
                     actor),
                 cancellationToken);
@@ -215,4 +217,4 @@ internal static class AdminEndpoints
 }
 
 public sealed record AddTrackedPlayerRequest(long OsuUserId, TrackingTier TrackingTier = TrackingTier.Tier3);
-public sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier, bool IsMaintenanceMode);
+public sealed record UpdateMarketSettingsRequest(decimal PpMultiplier, decimal TradeMultiplier, decimal DecayMultiplier, decimal TradeFeeMultiplier, bool IsMaintenanceMode);

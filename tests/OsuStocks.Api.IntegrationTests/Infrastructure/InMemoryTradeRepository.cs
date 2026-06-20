@@ -52,6 +52,15 @@ internal sealed class InMemoryTradeRepository : ITradeRepository
         return Task.FromResult(exists);
     }
 
+    public Task<decimal> SumQuantityByStockSinceAsync(Guid stockId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var total = _tradesById.Values
+            .Where(x => x.StockId == stockId && x.ExecutedAt >= since)
+            .Sum(x => x.Quantity);
+
+        return Task.FromResult(total);
+    }
+
     private static Trade? Clone(Trade? trade)
     {
         if (trade is null)

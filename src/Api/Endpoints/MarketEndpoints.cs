@@ -255,7 +255,9 @@ internal static class MarketEndpoints
                 volatility7d = result.Value.Volatility7d,
                 ownershipCount = result.Value.OwnershipCount,
                 activeTraders24h = result.Value.ActiveTraders24h,
-                marketCap = result.Value.MarketCap
+                marketCap = result.Value.MarketCap,
+                liquidity = result.Value.Liquidity,
+                liquidityTier = result.Value.LiquidityTier
             });
         });
 

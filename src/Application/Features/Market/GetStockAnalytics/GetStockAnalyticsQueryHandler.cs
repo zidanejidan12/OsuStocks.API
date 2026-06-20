@@ -25,6 +25,8 @@ public sealed class GetStockAnalyticsQueryHandler(IMarketReadRepository marketRe
             analytics.Volatility7d,
             analytics.OwnershipCount,
             analytics.ActiveTraders24h,
-            analytics.MarketCap));
+            analytics.MarketCap,
+            analytics.Liquidity,
+            analytics.LiquidityTier));
     }
 }

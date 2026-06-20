@@ -20,7 +20,10 @@ public sealed class MarketPriceEngineTests
         PriceFloor: 1m,
         RankChangeImpactScale: 0.5m,
         MaxRankChangeImpact: 0.05m,
-        MaxTradeImpact: 0.10m);
+        MaxTradeImpact: 0.10m,
+        ReferenceLiquidityDepth: 1000m,
+        SpreadBaseRate: 0.02m,
+        SpreadMinRate: 0.001m);
 
     [Fact]
     public void Calculate_BuyOrder_IncreasesPriceUsingConfiguredCoefficient()
@@ -132,5 +135,34 @@ public sealed class MarketPriceEngineTests
         var result = _engine.Calculate(1.20m, MarketPriceInput.Inactivity(), Coefficients);
 
         Assert.Equal(1m, result.NewPrice);
+    }
+
+    [Fact]
+    public void Calculate_BuyOrder_LiquidityDampensImpact()
+    {
+        // Buy(2): liquidity 0 -> factor 1 -> 0.01*2 = 0.02. liquidity == refDepth(1000) -> factor 0.5 -> 0.01.
+        var illiquid = _engine.Calculate(100m, MarketPriceInput.Buy(2, liquidity: 0m), Coefficients);
+        var liquid = _engine.Calculate(100m, MarketPriceInput.Buy(2, liquidity: 1000m), Coefficients);
+
+        Assert.Equal(0.02m, illiquid.PercentageChange);
+        Assert.Equal(0.01m, liquid.PercentageChange);
+    }
+
+    [Fact]
+    public void Calculate_Trade_SpreadShrinksWithLiquidity()
+    {
+        var thin = _engine.Calculate(100m, MarketPriceInput.Buy(1, liquidity: 0m), Coefficients);
+        var deep = _engine.Calculate(100m, MarketPriceInput.Buy(1, liquidity: 1000m), Coefficients);
+
+        Assert.Equal(0.02m, thin.SpreadRate);   // SpreadBaseRate at zero liquidity
+        Assert.Equal(0.01m, deep.SpreadRate);   // halved at liquidity == refDepth
+    }
+
+    [Fact]
+    public void Calculate_NonTrade_HasNoSpread()
+    {
+        var result = _engine.Calculate(100m, MarketPriceInput.PpIncrease(1000m, 1200m), Coefficients);
+
+        Assert.Equal(0m, result.SpreadRate);
     }
 }
