@@ -35,7 +35,7 @@ Implemented modules:
 - Admin: market settings management (multipliers + maintenance mode toggle)
 - Background jobs (Hangfire/Worker): 4-tier osu sync (1m/5m/15m + hourly long tail) with token-bucket rate limiting + bounded concurrency, daily inactivity decay (03:00), daily wealth-snapshot capture (02:30), daily snapshot retention (04:00) and market-history retention (04:30)
 - Security: CORS, rate limiting, global exception handler, concurrency conflict handling (HTTP 409), anti-abuse (trade cooldown, position limits, rapid trading detection)
-- Deployment: Docker (API + Worker + PostgreSQL + Redis + nginx)
+- Deployment: Docker Compose (API + Worker + frontend + PostgreSQL + Redis + Caddy auto-TLS + nightly backups + Prometheus/Grafana) — see `deploy/README.md`
 
 ## Tech Stack
 
@@ -46,7 +46,7 @@ Implemented modules:
 - MediatR + FluentValidation
 - Mapster
 - Swagger (Swashbuckle)
-- Docker + nginx
+- Docker Compose + Caddy (auto-TLS reverse proxy)
 
 ## Requirements
 
@@ -70,8 +70,10 @@ Implemented modules:
 |-- tests/
 |   |-- OsuStocks.Api.IntegrationTests/
 |   `-- OsuStocks.Application.UnitTests/
-|-- nginx/              # Reverse proxy configuration
-|-- docker-compose.yml  # Full stack deployment
+|-- nginx/              # Reverse proxy config for the local dev compose
+|-- deploy/             # Production: Caddyfile, deploy.sh, observability, runbook
+|-- docker-compose.yml      # Local dev stack
+|-- docker-compose.prod.yml # Production stack (api/worker/web/db/redis/caddy/backups/metrics)
 |-- OsuStocks.sln
 `-- README.md
 ```
@@ -119,16 +121,26 @@ Important: `OsuOAuth:RedirectUri` must exactly match the callback URL registered
 
 ## Production Deployment
 
-### Docker Compose (recommended)
+Production runs on a single host from `docker-compose.prod.yml`: **api, worker, web**
+(the Next.js frontend from the sibling `OsuStocks.Web` repo), **postgres, redis**,
+**caddy** (auto-TLS reverse proxy, the only service publishing host ports), a
+**db-backup** sidecar (nightly `pg_dump`), and the **Prometheus/Grafana** stack.
+TLS and routing are handled by Caddy (see `deploy/Caddyfile`); the canonical site is
+the apex `osustocks.com`, the API is `api.osustocks.com`.
+
+Full first-time runbook + DNS/secrets/observability: **`deploy/README.md`**.
+
+### Day-to-day deploys
+
+From the server, one command pulls both repos, rebuilds, and health-checks:
 
 ```bash
-# Create .env with production secrets (DB/Redis passwords, JWT signing key, osu! OAuth)
-docker compose up -d --build
+./deploy/deploy.sh             # pull + rebuild api/worker/web + up -d + /health check
+./deploy/deploy.sh --migrate   # also apply EF migrations (when a merged PR adds one)
+./deploy/deploy.sh --caddy     # also force-recreate caddy (after editing deploy/Caddyfile)
 ```
 
-Services started: api, worker, postgres, redis, nginx.
-
-Configure all secrets via environment variables / `.env` (see Configuration above). TLS is terminated at the nginx reverse proxy.
+Configure all secrets via `.env` (see `deploy/README.md`); never commit it.
 
 ### Manual Deployment
 

@@ -1,103 +1,125 @@
-# Deploying OsuStocks on a fresh Hetzner CX33
+# Deploying OsuStocks (Hetzner CX33)
 
-From a bare server + the `osustocks.com` domain to a live, HTTPS site with Grafana.
-The whole backend + observability stack runs from `docker-compose.prod.yml`.
-(The frontend, OsuStocks.Web, deploys separately — see step 7.)
+The whole stack — backend, worker, frontend, Postgres, Redis, Caddy (auto‑TLS),
+nightly backups, and Prometheus/Grafana observability — runs from
+`docker-compose.prod.yml` on a single box. Only **Caddy** publishes host ports
+(80/443); everything else is internal to the compose network.
+
+**Domains** (all → the server's IP, DNS at Porkbun):
+
+| Host | Serves |
+|------|--------|
+| `osustocks.com` (apex) | **Frontend** (the `web` service) — canonical site |
+| `app.osustocks.com` | 301 redirect → apex (legacy) |
+| `api.osustocks.com` | Backend API + the osu! OAuth callback |
+| `grafana.osustocks.com` | Grafana |
+
+The frontend (**OsuStocks.Web**) is a separate repo cloned as a **sibling** of this
+one; the `web` service builds it from `../OsuStocks.Web`.
 
 ---
 
-## 0. Secure the server
-Add your SSH public key in the Hetzner console (Server → SSH Keys) when creating
-the box, then SSH in as `root` and bootstrap (a bare box may lack `git`, and the
-script lives in the repo, so install + clone first):
+## First-time setup
+
+### 0. Secure the server
+SSH in as `root`, install git, clone, and bootstrap:
 ```bash
 apt-get update && apt-get install -y git
 git clone https://github.com/zidanejidan12/OsuStocks.API.git
 cd OsuStocks.API
-# SSH_PUBKEY installs your key for the unprivileged 'deploy' user the script creates
 SSH_PUBKEY="ssh-ed25519 AAAA... you@laptop" bash scripts/server-bootstrap.sh
 ```
-This creates a `deploy` sudo user, installs Docker + Compose, enables the `ufw`
-firewall (22/80/443 only) + `fail2ban`, and adds swap. **Then** test
-`ssh deploy@<ip>` from your laptop and run the optional SSH-hardening block the
-script prints (disables root/password login) — only after the new login works.
+Creates a `deploy` sudo user, installs Docker + Compose, enables `ufw` (22/80/443)
++ `fail2ban`, adds swap. Then test `ssh deploy@<ip>` and run the SSH‑hardening block
+the script prints. Also set the **Hetzner Cloud Firewall** to 22/80/443 only.
 
-> Private repo? The `git clone` will prompt for auth — use a PAT
-> (`git clone https://<token>@github.com/zidanejidan12/OsuStocks.API.git`).
+### 1. DNS (Porkbun)
+A records → the server IP for the apex `osustocks.com`, `api.`, `grafana.`, and
+`app.` (the last just to power the redirect). The apex A record (host left blank)
+is required before Caddy can issue the apex cert.
 
-> Also set the **Hetzner Cloud Firewall** in the console to allow only 22/80/443.
-
-## 1. DNS
-At your registrar, create **A records → your server IP**:
-| Host | Purpose |
-|------|---------|
-| `api.osustocks.com` | backend |
-| `grafana.osustocks.com` | Grafana |
-| `app.osustocks.com` | frontend (deployed separately) |
-
-## 2. Get the code + secrets
-As the `deploy` user:
+### 2. Code + secrets (as the `deploy` user)
+Clone **both** repos as siblings, then fill in secrets:
 ```bash
 git clone https://github.com/zidanejidan12/OsuStocks.API.git
+git clone https://github.com/zidanejidan12/OsuStocks.Web.git   # sibling — the `web` service builds this
 cd OsuStocks.API
 cp .env.prod.example .env
-# edit .env: POSTGRES_PASSWORD, OSUOAUTH_*, JWT_SIGNING_KEY, GRAFANA_ADMIN_PASSWORD, APP_ORIGIN
+# edit .env: POSTGRES_PASSWORD, OSUOAUTH_*, JWT_SIGNING_KEY, GRAFANA_ADMIN_PASSWORD,
+#            APP_ORIGIN=https://osustocks.com
 ```
 
-## 3. osu! OAuth (production)
-Create an OAuth app at <https://osu.ppy.sh/home/account/edit> with callback
-`https://api.osustocks.com/api/v1/auth/callback`, and put the client id/secret +
-that redirect URI into `.env`.
+### 3. osu! OAuth (production)
+Create an app at <https://osu.ppy.sh/home/account/edit> with callback
+`https://api.osustocks.com/api/v1/auth/callback` (this stays on the `api.`
+subdomain regardless of the frontend domain), and put the client id/secret +
+redirect URI into `.env`.
 
-## 4. Bring up the stack
+### 4. First bring-up + migrate
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+./deploy/deploy.sh --no-pull --migrate     # applies the EF schema (first run)
 ```
-This starts postgres, redis, api, worker, caddy (auto‑TLS), prometheus, grafana,
-and the node/postgres/redis exporters. Caddy fetches Let's Encrypt certs for the
-subdomains (DNS must already resolve to the box).
 
-## 5. Apply database migrations
-The app does **not** auto‑migrate. Run once (and after each deploy with new migrations):
+### 5. Make an admin
+OAuth creates `User` accounts. Promote yourself (then log out/in — the role is baked
+into the JWT at login):
 ```bash
-source .env
-docker run --rm --network osustocks_default -v "$PWD":/src -w /src \
-  -e ConnectionStrings__Postgres="Host=postgres;Port=5432;Database=osu_stocks;Username=osu_stocks;Password=$POSTGRES_PASSWORD" \
-  mcr.microsoft.com/dotnet/sdk:9.0 bash -lc \
-  "dotnet tool install --global dotnet-ef >/dev/null 2>&1; export PATH=\$PATH:/root/.dotnet/tools; \
-   dotnet restore && \
-   dotnet ef database update --project src/Infrastructure/OsuStocks.Infrastructure.csproj \
-   --startup-project src/Api/OsuStocks.Api.csproj"
+docker compose -f docker-compose.prod.yml exec postgres \
+  psql -U osu_stocks -d osu_stocks -c "UPDATE users SET role='Admin' WHERE username='YOUR_OSU_NAME';"
 ```
-> Cleaner long‑term: add `dbContext.Database.Migrate()` on API startup (with a
-> single migrator so api+worker don't race) so deploys self‑migrate. Ask and I'll wire it.
-
-## 6. Verify
-- `https://api.osustocks.com/health` → `200` healthy (Postgres + Redis green).
-- `https://grafana.osustocks.com` → log in as `admin` / `GRAFANA_ADMIN_PASSWORD`.
-- In Grafana: **Connections → Data sources → Add Prometheus**, URL `http://prometheus:9090`.
-- Import dashboards (Dashboards → Import by ID): **1860** (Node Exporter Full),
-  **9628** (PostgreSQL), **763** (Redis). Build a custom one for the app's osu! API
-  metrics (and trades/economy) on top.
-
-## 7. Frontend
-OsuStocks.Web (Next.js) is a separate app. Deploy it as a container named `web`
-on this network (then uncomment the `app.osustocks.com` block in `deploy/Caddyfile`)
-or host it elsewhere (Vercel/another box) pointing `app.osustocks.com` at it.
-Either way set `APP_ORIGIN` in `.env` to its HTTPS origin for CORS.
 
 ---
 
-## Notes & trade‑offs
-- **Metrics today:** the app currently exports only the **osu! API** metrics meter via
-  OTLP. Host/DB/Redis come from the exporters above. To also get HTTP request
-  rate/latency, .NET runtime/GC, and the Hangfire sync‑job meter, add
-  `AddAspNetCoreInstrumentation/AddHttpClientInstrumentation/AddRuntimeInstrumentation`
-  + `AddMeter(...)` in `ObservabilityExtensions.cs` (small code change — ask).
-- **Security:** only Caddy publishes host ports; Postgres/Redis/Prometheus/exporters
-  are internal to the compose network. Keep it that way.
-- **Latency:** Hetzner Cloud has no Asia DC (DE/FI/US only) — expect ~150–250 ms to
-  Indonesian players, vs the earlier Singapore plan. Fine for launch/beta.
-- **Resources:** with `retention=30d` + 30s scrape, the observability stack adds
-  roughly ~0.6–0.8 GB RAM on top of the app — comfortable on the CX33's 8 GB.
-- **Backups:** add a cron'd `pg_dump` into the `postgres_backups` volume (ask and I'll add a job).
+## Day-to-day deploys
+
+One command (run from the repo, replaces the manual pull/build/up dance):
+```bash
+./deploy/deploy.sh             # pull both repos, rebuild + recreate api/worker/web, health-check
+./deploy/deploy.sh --migrate   # also apply EF migrations — use when a merged PR adds one
+./deploy/deploy.sh --caddy     # also force-recreate caddy — use after editing deploy/Caddyfile
+./deploy/deploy.sh --no-pull   # deploy the current checkout without pulling
+```
+It pulls `OsuStocks.API` + the sibling `OsuStocks.Web`, builds `api`/`worker`/`web`,
+optionally migrates, `up -d`, and polls `/health`. (First time: `chmod +x deploy/deploy.sh`,
+or run `bash deploy/deploy.sh`.) The PR description says when `--migrate` is needed.
+
+> No auto‑migrate on startup by design (api + worker would race). `--migrate` runs a
+> one‑off `dotnet/sdk:9.0` container; it's idempotent (applies only pending migrations).
+
+## Verify
+- `https://api.osustocks.com/health` → `200` (Postgres + Redis green). `/swagger` is off in prod.
+- `https://osustocks.com` loads the frontend; `https://app.osustocks.com` 301s to it.
+- `https://grafana.osustocks.com` → log in as `admin` / `GRAFANA_ADMIN_PASSWORD`.
+
+## Backups
+The `db-backup` sidecar runs a nightly `pg_dump` into the `postgres_backups` volume,
+keeping 7 daily / 4 weekly / 6 monthly copies. Force one / list / restore:
+```bash
+docker compose -f docker-compose.prod.yml exec db-backup /backup.sh
+docker compose -f docker-compose.prod.yml exec db-backup ls -lh /backups/last
+# restore:
+docker compose -f docker-compose.prod.yml exec db-backup sh -c \
+  "gunzip -c /backups/last/osu_stocks-latest.sql.gz | psql -U osu_stocks -d osu_stocks"
+```
+
+## Observability / Grafana
+The app pushes OpenTelemetry **metrics over OTLP** to Prometheus
+(`OTEL_EXPORTER_OTLP_ENDPOINT=http://prometheus:9090/api/v1/otlp`,
+`http/protobuf`); host/DB/Redis come from the node/postgres/redis exporters.
+- **Connections → Data sources → Add Prometheus**, URL `http://prometheus:9090`.
+- Import dashboards by ID: **1860** (Node Exporter), **9628** (PostgreSQL), **763** (Redis).
+- App metrics already exported: the **osu! API** meter (`osu_api_*`, incl. `outcome="rate_limited"`
+  for 429s) and the **economy** gauges (`economy_credits_circulating|minted|burned`).
+- Search Console: verify `osustocks.com` (DNS TXT) and submit `https://osustocks.com/sitemap.xml`.
+
+## Notes & trade-offs
+- **Metrics still TODO:** HTTP request rate/latency, .NET runtime/GC, and the Hangfire
+  job meter — add `AddAspNetCoreInstrumentation/AddHttpClientInstrumentation/AddRuntimeInstrumentation`
+  in `ObservabilityExtensions.cs`.
+- **Security:** only Caddy publishes host ports; keep DB/Redis/Prometheus/exporters internal.
+- **Latency:** Hetzner has no Asia DC (DE/FI/US) — ~150–250 ms to Indonesian players.
+- **osu! API rate:** prod runs `OsuApi__RequestsPerMinute` from config; if Grafana shows
+  rising `osu_api_requests_total{outcome="rate_limited"}`, lower it (per-process) on api+worker.
+- **Migrations leave root-owned `obj/bin`** in the repo (the SDK container runs as root); if a
+  later `git pull` fails on permissions, `sudo chown -R deploy:deploy .`.
