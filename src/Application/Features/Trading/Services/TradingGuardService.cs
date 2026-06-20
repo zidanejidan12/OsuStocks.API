@@ -77,8 +77,19 @@ public sealed class TradingGuardService(
                 "Position limit exceeded. UserId={UserId}, StockId={StockId}, CurrentHolding={CurrentHolding}, RequestedQuantity={RequestedQuantity}, TotalSupply={TotalSupply}, OwnershipPercent={OwnershipPercent:F1}, MaxPercent={MaxPercent}",
                 userId, stockId, currentHoldingQuantity, requestedQuantity, totalSupply, ownershipPercentage, maxPercentage);
 
-            return Result.Failure("POSITION_LIMIT_EXCEEDED",
-                $"This purchase would exceed the maximum ownership limit of {maxPercentage}% per stock.");
+            // Largest extra quantity q that keeps (current + q) / (supply + q) <= p, where p = maxPercentage/100.
+            // Shares trade to 2 dp, so floor — the suggested amount must never itself trip the limit.
+            var fraction = maxPercentage / 100m;
+            var maxAdditionalRaw = (fraction * totalSupply - currentHoldingQuantity) / (1m - fraction);
+            var maxAdditional = maxAdditionalRaw <= 0m
+                ? 0m
+                : Math.Floor(maxAdditionalRaw * 100m) / 100m;
+
+            var message = maxAdditional <= 0m
+                ? $"You already hold the maximum {maxPercentage:0.##}% of this stock, so you can't buy more right now."
+                : $"A single trader can hold at most {maxPercentage:0.##}% of a stock — you can buy up to {maxAdditional:0.##} more share{(maxAdditional == 1m ? "" : "s")} of this one.";
+
+            return Result.Failure("POSITION_LIMIT_EXCEEDED", message);
         }
 
         return Result.Success();
