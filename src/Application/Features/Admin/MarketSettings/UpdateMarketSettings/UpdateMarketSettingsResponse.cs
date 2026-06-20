@@ -4,4 +4,5 @@ public sealed record UpdateMarketSettingsResponse(
     decimal PpMultiplier,
     decimal TradeMultiplier,
     decimal DecayMultiplier,
+    decimal TradeFeeMultiplier,
     bool IsMaintenanceMode);

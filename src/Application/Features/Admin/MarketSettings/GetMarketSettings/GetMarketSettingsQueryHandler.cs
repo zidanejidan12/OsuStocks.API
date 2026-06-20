@@ -17,6 +17,7 @@ public sealed class GetMarketSettingsQueryHandler(IMarketSettingsRepository mark
             settings?.PpMultiplier ?? 1m,
             settings?.TradeMultiplier ?? 1m,
             settings?.DecayMultiplier ?? 1m,
+            settings?.TradeFeeMultiplier ?? 1m,
             settings?.IsMaintenanceMode ?? false));
     }
 }

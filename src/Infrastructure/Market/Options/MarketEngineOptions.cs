@@ -27,4 +27,22 @@ public sealed class MarketEngineOptions
     // pump-and-dump vector: a large order moves the price at most this much regardless of quantity.
     // NOT scaled by the admin trade multiplier — it's a safety cap, not a tunable sensitivity.
     public decimal MaxTradeImpact { get; set; } = 0.10m;
+
+    // Progressive (PPh-21-style) trade fee charged on both buys and sells as an inflation sink — the
+    // fee is burned (removed from circulation). Each bracket's Rate applies only to the portion of the
+    // trade value within it (marginal); the top bracket is unbounded. The overall magnitude is scaled
+    // live by MarketSettings.TradeFeeMultiplier. Order by UpTo ascending.
+    public List<TradeFeeBracketOption> TradeFeeBrackets { get; set; } =
+    [
+        new() { UpTo = 10_000m, Rate = 0.005m },      // first 10k: 0.5%
+        new() { UpTo = 100_000m, Rate = 0.01m },      // 10k–100k: 1%
+        new() { UpTo = 1_000_000m, Rate = 0.02m },    // 100k–1M: 2%
+        new() { UpTo = 1_000_000_000m, Rate = 0.03m } // above 1M: 3% (top bracket, treated as unbounded)
+    ];
+}
+
+public sealed class TradeFeeBracketOption
+{
+    public decimal UpTo { get; set; }
+    public decimal Rate { get; set; }
 }

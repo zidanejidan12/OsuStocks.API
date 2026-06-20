@@ -24,6 +24,7 @@ public sealed class BuyStockCommandHandler(
     IApplicationDbContext dbContext,
     IPublisher publisher,
     IMarketEventProcessingService marketEventProcessingService,
+    ITradeFeePolicy tradeFeePolicy,
     ITradingGuardService tradingGuardService)
     : IRequestHandler<BuyStockCommand, Result<BuyStockResponse>>
 {
@@ -93,13 +94,17 @@ public sealed class BuyStockCommandHandler(
         var unitPrice = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
         var totalAmount = unitPrice * request.Quantity;
 
-        if (wallet.Balance < totalAmount)
+        // Progressive service fee, charged on top of the purchase and burned (inflation sink).
+        var fee = await tradeFeePolicy.ComputeFeeAsync(totalAmount, cancellationToken);
+        var totalDebit = totalAmount + fee;
+
+        if (wallet.Balance < totalDebit)
         {
             // Nothing has been saved yet, so the staged price move is discarded with the scope.
             return Result.Failure<BuyStockResponse>("INSUFFICIENT_BALANCE", "Wallet balance is insufficient.");
         }
 
-        wallet.Balance -= totalAmount;
+        wallet.Balance -= totalDebit;
         wallet.UpdatedAt = DateTimeOffset.UtcNow;
         wallet.UpdatedBy = "trading";
         walletRepository.Update(wallet);
@@ -159,6 +164,19 @@ public sealed class BuyStockCommandHandler(
         };
         await walletTransactionRepository.AddAsync(walletTransaction, cancellationToken);
 
+        if (fee > 0m)
+        {
+            await walletTransactionRepository.AddAsync(new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = wallet.Id,
+                TransactionType = WalletTransactionType.TradeFee,
+                Amount = fee,
+                ReferenceId = trade.Id,
+                CreatedAt = executedAt
+            }, cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await publisher.Publish(new BuyOrderExecutedNotification(
@@ -167,6 +185,6 @@ public sealed class BuyStockCommandHandler(
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
-        return Result.Success(new BuyStockResponse(trade.Id, unitPrice, totalAmount));
+        return Result.Success(new BuyStockResponse(trade.Id, unitPrice, totalAmount, fee));
     }
 }

@@ -23,6 +23,7 @@ public sealed class SellStockCommandHandler(
     IApplicationDbContext dbContext,
     IPublisher publisher,
     IMarketEventProcessingService marketEventProcessingService,
+    ITradeFeePolicy tradeFeePolicy,
     ITradingGuardService tradingGuardService)
     : IRequestHandler<SellStockCommand, Result<SellStockResponse>>
 {
@@ -81,6 +82,10 @@ public sealed class SellStockCommandHandler(
         var unitPrice = (priceChange.PreviousPrice + priceChange.NewPrice) / 2m;
         var totalAmount = unitPrice * request.Quantity;
 
+        // Progressive service fee, deducted from the proceeds and burned (inflation sink).
+        var fee = await tradeFeePolicy.ComputeFeeAsync(totalAmount, cancellationToken);
+        var netProceeds = totalAmount - fee;
+
         holding.Quantity -= request.Quantity;
         holding.UpdatedAt = DateTimeOffset.UtcNow;
         holding.UpdatedBy = "trading";
@@ -94,7 +99,7 @@ public sealed class SellStockCommandHandler(
             holdingRepository.Update(holding);
         }
 
-        wallet.Balance += totalAmount;
+        wallet.Balance += netProceeds;
         wallet.UpdatedAt = DateTimeOffset.UtcNow;
         wallet.UpdatedBy = "trading";
         walletRepository.Update(wallet);
@@ -123,6 +128,19 @@ public sealed class SellStockCommandHandler(
         };
         await walletTransactionRepository.AddAsync(walletTransaction, cancellationToken);
 
+        if (fee > 0m)
+        {
+            await walletTransactionRepository.AddAsync(new WalletTransaction
+            {
+                Id = Guid.NewGuid(),
+                WalletId = wallet.Id,
+                TransactionType = WalletTransactionType.TradeFee,
+                Amount = fee,
+                ReferenceId = trade.Id,
+                CreatedAt = executedAt
+            }, cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await publisher.Publish(new SellOrderExecutedNotification(
@@ -131,6 +149,6 @@ public sealed class SellStockCommandHandler(
 
         await tradingGuardService.CheckRapidTradingAsync(request.UserId, cancellationToken);
 
-        return Result.Success(new SellStockResponse(trade.Id, unitPrice, totalAmount));
+        return Result.Success(new SellStockResponse(trade.Id, unitPrice, totalAmount, fee));
     }
 }

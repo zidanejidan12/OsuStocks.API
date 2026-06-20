@@ -26,6 +26,7 @@ public sealed class UpdateMarketSettingsCommandHandler(
                 PpMultiplier = request.PpMultiplier,
                 TradeMultiplier = request.TradeMultiplier,
                 DecayMultiplier = request.DecayMultiplier,
+                TradeFeeMultiplier = request.TradeFeeMultiplier,
                 IsMaintenanceMode = request.IsMaintenanceMode,
                 CreatedAt = now,
                 CreatedBy = actor
@@ -38,6 +39,7 @@ public sealed class UpdateMarketSettingsCommandHandler(
             settings.PpMultiplier = request.PpMultiplier;
             settings.TradeMultiplier = request.TradeMultiplier;
             settings.DecayMultiplier = request.DecayMultiplier;
+            settings.TradeFeeMultiplier = request.TradeFeeMultiplier;
             settings.IsMaintenanceMode = request.IsMaintenanceMode;
             settings.UpdatedAt = now;
             settings.UpdatedBy = actor;
@@ -51,6 +53,7 @@ public sealed class UpdateMarketSettingsCommandHandler(
             settings.PpMultiplier,
             settings.TradeMultiplier,
             settings.DecayMultiplier,
+            settings.TradeFeeMultiplier,
             settings.IsMaintenanceMode));
     }
 }

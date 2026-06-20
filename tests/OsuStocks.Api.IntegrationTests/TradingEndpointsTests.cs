@@ -85,6 +85,7 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
 
         decimal walletAfterBuyBalance;
         decimal rewardCreditsAfterBuy;
+        decimal buyFee;
         Guid walletId;
 
         using (var scope = factory.Services.CreateScope())
@@ -108,13 +109,20 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
             // Average-fill slippage charges the midpoint 2.10, so 500 * 2.10 = 1050.
             Assert.Equal(1050m, buyLedgerEntry.Amount);
 
+            // Progressive service fee on the 1050 trade value: first bracket 0.5% = 5.25, burned via
+            // its own TradeFee ledger entry (charged on top of the purchase).
+            buyFee = walletTransactionsAfterBuy
+                .Where(x => x.TransactionType == WalletTransactionType.TradeFee)
+                .Sum(x => x.Amount);
+            Assert.Equal(5.25m, buyFee);
+
             rewardCreditsAfterBuy = walletTransactionsAfterBuy
                 .Where(x => x.TransactionType is WalletTransactionType.AchievementReward
                     or WalletTransactionType.MissionReward)
                 .Sum(x => x.Amount);
         }
 
-        Assert.Equal(1_000_000m - 1050m + rewardCreditsAfterBuy, walletAfterBuyBalance);
+        Assert.Equal(1_000_000m - 1050m - buyFee + rewardCreditsAfterBuy, walletAfterBuyBalance);
 
         var sellResponse = await client.PostAsJsonAsync(
             "/api/v1/trading/sell",
@@ -170,7 +178,12 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
                     or WalletTransactionType.MissionReward)
                 .Sum(x => x.Amount);
 
-            var expectedBalance = 1_000_000m - buyTrade.TotalAmount + sellTrade.TotalAmount + rewardCredits;
+            // Trade fees (buy + sell) are burned via TradeFee ledger entries, so subtract them.
+            var totalFees = ledgerAfterSell
+                .Where(x => x.TransactionType == WalletTransactionType.TradeFee)
+                .Sum(x => x.Amount);
+
+            var expectedBalance = 1_000_000m - buyTrade.TotalAmount + sellTrade.TotalAmount - totalFees + rewardCredits;
             Assert.Equal(expectedBalance, walletAfterSell.Balance);
 
             var tradeLedger = ledgerAfterSell

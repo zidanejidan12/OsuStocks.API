@@ -9,5 +9,6 @@ public enum WalletTransactionType
     AdminGrant = 5,
     AdminDeduction = 6,
     MissionReward = 7,
-    AchievementReward = 8
+    AchievementReward = 8,
+    TradeFee = 9
 }
