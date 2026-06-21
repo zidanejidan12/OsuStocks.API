@@ -34,7 +34,8 @@ if [ "$PULL" -eq 1 ]; then
     echo "==> Pulling OsuStocks.Web ($WEB_DIR)"
     git -C "$WEB_DIR" pull --ff-only
   else
-    echo "!! Web repo not found at $WEB_DIR — skipping its pull (set WEB_DIR to override)"
+    echo "!! Web repo not found at $WEB_DIR — the web build would use a stale/missing context. Aborting (set WEB_DIR to override)." >&2
+    exit 1
   fi
 fi
 
@@ -43,6 +44,10 @@ echo "==> Building images (api, worker, web)"
 
 if [ "$MIGRATE" -eq 1 ]; then
   echo "==> Applying database migrations"
+  if [ ! -f ./.env ]; then
+    echo "!! ./.env not found — required for migrations (POSTGRES_PASSWORD). Aborting." >&2
+    exit 1
+  fi
   set -a; . ./.env; set +a
   docker run --rm --network osustocks_default -v "$PWD":/src -w /src \
     -e ConnectionStrings__Postgres="Host=postgres;Port=5432;Database=osu_stocks;Username=osu_stocks;Password=$POSTGRES_PASSWORD" \
@@ -64,14 +69,30 @@ if [ "$CADDY" -eq 1 ]; then
 fi
 
 echo "==> Health check"
-ok=0
-for _ in $(seq 1 10); do
-  if curl -fsS -o /dev/null https://api.osustocks.com/health; then ok=1; break; fi
-  sleep 3
-done
-if [ "$ok" -eq 1 ]; then
-  echo "OK — https://api.osustocks.com/health is healthy. Deploy complete."
-else
-  echo "!! Health check failed after ~30s. Check: ${COMPOSE[*]} logs --tail=50 api" >&2
+check_url() {
+  # $1 = label, $2 = url; retries ~30s like the original API check.
+  local label="$1" url="$2"
+  for _ in $(seq 1 10); do
+    if curl -fsS -o /dev/null "$url"; then
+      echo "OK — $url ($label) is healthy."
+      return 0
+    fi
+    sleep 3
+  done
+  echo "!! Health check failed for $label ($url) after ~30s." >&2
+  return 1
+}
+
+if ! check_url "api" https://api.osustocks.com/health; then
+  echo "!! Check: ${COMPOSE[*]} logs --tail=50 api" >&2
   exit 1
 fi
+if ! check_url "frontend" https://osustocks.com/; then
+  echo "!! Check: ${COMPOSE[*]} logs --tail=50 web" >&2
+  exit 1
+fi
+if ! check_url "grafana" https://grafana.osustocks.com/; then
+  echo "!! Check: ${COMPOSE[*]} logs --tail=50 grafana caddy" >&2
+  exit 1
+fi
+echo "Deploy complete."
