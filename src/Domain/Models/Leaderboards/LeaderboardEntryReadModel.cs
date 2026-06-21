@@ -7,4 +7,5 @@ public sealed record LeaderboardEntryReadModel(
     string? AvatarUrl,
     string? CountryCode,
     decimal Value,
-    decimal? PeriodChange);
+    decimal? PeriodChange,
+    string? EquippedTitleCode);
