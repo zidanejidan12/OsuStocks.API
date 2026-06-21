@@ -8,5 +8,6 @@ public sealed record CurrentUserProfileResponse(
     string Username,
     string? AvatarUrl,
     string? CountryCode,
+    string? CoverUrl,
     string Role,
     GetInvestorLevelResponse InvestorLevel);

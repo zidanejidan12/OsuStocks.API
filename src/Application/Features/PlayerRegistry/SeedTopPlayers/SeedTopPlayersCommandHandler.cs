@@ -97,6 +97,7 @@ public sealed class SeedTopPlayersCommandHandler(
                     Username = entry.Username,
                     AvatarUrl = entry.AvatarUrl,
                     CountryCode = entry.CountryCode,
+                    ProfileCoverUrl = entry.ProfileCoverUrl,
                     TrackingTier = RankTierPolicy.TierForRank(entry.GlobalRank),
                     IsActive = true,
                     CreatedAt = now,

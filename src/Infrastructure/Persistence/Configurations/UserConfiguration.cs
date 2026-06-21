@@ -16,6 +16,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.Username).HasColumnName("username").HasMaxLength(64).IsRequired();
         builder.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(512);
         builder.Property(x => x.CountryCode).HasColumnName("country_code").HasMaxLength(2);
+        builder.Property(x => x.ProfileCoverUrl).HasColumnName("profile_cover_url").HasMaxLength(512);
         builder.Property(x => x.Role).HasColumnName("role").HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(100);

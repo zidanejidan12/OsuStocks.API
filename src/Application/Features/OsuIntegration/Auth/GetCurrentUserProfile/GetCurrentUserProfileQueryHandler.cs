@@ -32,6 +32,7 @@ public sealed class GetCurrentUserProfileQueryHandler(
             user.Username,
             user.AvatarUrl,
             user.CountryCode,
+            user.ProfileCoverUrl,
             user.Role.ToString(),
             new GetInvestorLevelResponse(
                 progress.Level,
