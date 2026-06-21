@@ -42,12 +42,15 @@ public sealed class MarketEngineOptions
     public decimal SpreadBaseRate { get; set; } = 0.02m;
     public decimal SpreadMinRate { get; set; } = 0.001m;
 
+    // Progressive (PPh-21-style) marginal rates. Combined with the live ~10x admin
+    // multiplier these give an effective fee of ~12.5% on small trades, ~15% on a
+    // typical mid-size trade, scaling higher for whales (anti-inflation by design).
     public List<TradeFeeBracketOption> TradeFeeBrackets { get; set; } =
     [
-        new() { UpTo = 10_000m, Rate = 0.005m },      // first 10k: 0.5%
-        new() { UpTo = 100_000m, Rate = 0.01m },      // 10k–100k: 1%
-        new() { UpTo = 1_000_000m, Rate = 0.02m },    // 100k–1M: 2%
-        new() { UpTo = 1_000_000_000m, Rate = 0.03m } // above 1M: 3% (top bracket, treated as unbounded)
+        new() { UpTo = 10_000m, Rate = 0.0125m },     // first 10k: 1.25%
+        new() { UpTo = 100_000m, Rate = 0.025m },     // 10k–100k: 2.5%
+        new() { UpTo = 1_000_000m, Rate = 0.05m },    // 100k–1M: 5%
+        new() { UpTo = 1_000_000_000m, Rate = 0.075m } // above 1M: 7.5% (top bracket, treated as unbounded)
     ];
 }
 
