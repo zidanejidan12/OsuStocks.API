@@ -2,13 +2,15 @@ using MediatR;
 using OsuStocks.Application.Common.Caching;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Application.Features.Leaderboards.Common;
+using OsuStocks.Domain.Achievements.Interfaces;
 using OsuStocks.Domain.Repositories;
 
 namespace OsuStocks.Application.Features.Leaderboards.GetWealthLeaderboard;
 
 public sealed class GetWealthLeaderboardQueryHandler(
     ILeaderboardReadRepository leaderboardReadRepository,
-    IReadModelCache readModelCache)
+    IReadModelCache readModelCache,
+    IAchievementCatalog achievementCatalog)
     : IRequestHandler<GetWealthLeaderboardQuery, Result<GetWealthLeaderboardResponse>>
 {
     public async Task<Result<GetWealthLeaderboardResponse>> Handle(
@@ -25,6 +27,8 @@ public sealed class GetWealthLeaderboardQueryHandler(
             ct => leaderboardReadRepository.GetWealthAsync(periodStart, skip, request.PageSize, ct),
             cancellationToken);
 
+        var titleByCode = achievementCatalog.All.ToDictionary(a => a.Code, a => a.Name);
+
         return Result.Success(new GetWealthLeaderboardResponse(
             entries.Select(x => new LeaderboardEntryResponse(
                 x.Rank,
@@ -33,7 +37,8 @@ public sealed class GetWealthLeaderboardQueryHandler(
                 x.AvatarUrl,
                 x.CountryCode,
                 x.Value,
-                x.PeriodChange)).ToList(),
+                x.PeriodChange,
+                x.EquippedTitleCode is not null && titleByCode.TryGetValue(x.EquippedTitleCode, out var t) ? t : null)).ToList(),
             period,
             request.Page,
             request.PageSize));

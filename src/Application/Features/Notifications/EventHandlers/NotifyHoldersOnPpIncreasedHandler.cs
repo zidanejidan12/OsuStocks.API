@@ -33,7 +33,8 @@ public sealed class NotifyHoldersOnPpIncreasedHandler(
             return;
         }
 
-        var data = JsonSerializer.Serialize(notification.Event);
+        // Include the stock id so the client can deep-link the notification to the stock page.
+        var data = JsonSerializer.Serialize(new { stockId = stock.Id });
         var createdAt = notification.Event.OccurredAt == default
             ? DateTimeOffset.UtcNow
             : notification.Event.OccurredAt;

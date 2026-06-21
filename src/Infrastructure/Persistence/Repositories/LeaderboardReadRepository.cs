@@ -26,6 +26,7 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                 Username = user.Username,
                 AvatarUrl = user.AvatarUrl,
                 CountryCode = user.CountryCode,
+                EquippedTitleCode = user.EquippedTitleCode,
                 CurrentWealth =
                     (dbContext.Wallets
                         .Where(w => w.UserId == user.Id)
@@ -55,7 +56,8 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                 x.AvatarUrl,
                 x.CountryCode,
                 x.CurrentWealth,
-                x.SnapshotWealth is null ? null : x.CurrentWealth - x.SnapshotWealth.Value))
+                x.SnapshotWealth is null ? null : x.CurrentWealth - x.SnapshotWealth.Value,
+                x.EquippedTitleCode))
             .ToList();
     }
 
@@ -77,6 +79,7 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                 Username = user.Username,
                 AvatarUrl = user.AvatarUrl,
                 CountryCode = user.CountryCode,
+                EquippedTitleCode = user.EquippedTitleCode,
                 CurrentWealth =
                     (dbContext.Wallets
                         .Where(w => w.UserId == user.Id)
@@ -123,7 +126,8 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                     x.AvatarUrl,
                     x.CountryCode,
                     profit,
-                    x.SnapshotProfit is null ? null : profit - x.SnapshotProfit.Value);
+                    x.SnapshotProfit is null ? null : profit - x.SnapshotProfit.Value,
+                    x.EquippedTitleCode);
             })
             .ToList();
     }
@@ -156,6 +160,7 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                     Username = user.Username,
                     AvatarUrl = user.AvatarUrl,
                     CountryCode = user.CountryCode,
+                    EquippedTitleCode = user.EquippedTitleCode,
                     Volume = row.Volume
                 })
             .OrderByDescending(x => x.Volume)
@@ -172,7 +177,8 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
                 x.AvatarUrl,
                 x.CountryCode,
                 x.Volume,
-                null))
+                null,
+                x.EquippedTitleCode))
             .ToList();
     }
 
@@ -182,6 +188,7 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
         public string Username { get; init; } = string.Empty;
         public string? AvatarUrl { get; init; }
         public string? CountryCode { get; init; }
+        public string? EquippedTitleCode { get; init; }
         public decimal CurrentWealth { get; init; }
         public decimal? SnapshotWealth { get; init; }
     }
@@ -192,6 +199,7 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
         public string Username { get; init; } = string.Empty;
         public string? AvatarUrl { get; init; }
         public string? CountryCode { get; init; }
+        public string? EquippedTitleCode { get; init; }
         public decimal CurrentWealth { get; init; }
         public decimal Deposits { get; init; }
         public decimal Deductions { get; init; }
@@ -204,6 +212,7 @@ internal sealed class LeaderboardReadRepository(AppDbContext dbContext) : ILeade
         public string Username { get; init; } = string.Empty;
         public string? AvatarUrl { get; init; }
         public string? CountryCode { get; init; }
+        public string? EquippedTitleCode { get; init; }
         public decimal Volume { get; init; }
     }
 }
