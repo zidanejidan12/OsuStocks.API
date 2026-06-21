@@ -1,6 +1,7 @@
 using MediatR;
 using OsuStocks.Application.Common.Models;
 using OsuStocks.Application.Features.Investor.GetInvestorLevel;
+using OsuStocks.Domain.Achievements.Interfaces;
 using OsuStocks.Domain.Investor.Interfaces;
 using OsuStocks.Domain.Repositories;
 
@@ -9,7 +10,8 @@ namespace OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfi
 public sealed class GetCurrentUserProfileQueryHandler(
     IUserRepository userRepository,
     IInvestorProfileReadRepository investorProfileReadRepository,
-    IInvestorLevelCalculator levelCalculator)
+    IInvestorLevelCalculator levelCalculator,
+    IAchievementCatalog achievementCatalog)
     : IRequestHandler<GetCurrentUserProfileQuery, Result<CurrentUserProfileResponse>>
 {
     public async Task<Result<CurrentUserProfileResponse>> Handle(
@@ -26,6 +28,12 @@ public sealed class GetCurrentUserProfileQueryHandler(
             request.UserId, cancellationToken) ?? 0L;
         var progress = levelCalculator.GetProgress(totalXp);
 
+        // Resolve the equipped achievement's display name (null if none equipped or the code is
+        // no longer in the catalog) — the client falls back to the level title when null.
+        var equippedTitle = user.EquippedTitleCode is null
+            ? null
+            : achievementCatalog.All.FirstOrDefault(a => a.Code == user.EquippedTitleCode)?.Name;
+
         return Result.Success(new CurrentUserProfileResponse(
             user.Id,
             user.OsuUserId,
@@ -40,6 +48,9 @@ public sealed class GetCurrentUserProfileQueryHandler(
                 progress.TotalXp,
                 progress.XpIntoLevel,
                 progress.XpForNextLevel,
-                progress.ProgressToNext)));
+                progress.ProgressToNext),
+            user.EquippedTitleCode,
+            equippedTitle,
+            user.ShowcasedAchievementCodes));
     }
 }

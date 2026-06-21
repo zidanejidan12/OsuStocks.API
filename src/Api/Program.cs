@@ -200,6 +200,7 @@ app.MapNotificationEndpoints();
 app.MapInvestorEndpoints();
 app.MapAchievementEndpoints();
 app.MapMissionEndpoints();
+app.MapProfileEndpoints();
 app.MapAdminEndpoints();
 app.MapDailyLoginEndpoints();
 
