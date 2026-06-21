@@ -283,6 +283,139 @@ public sealed class TradingEndpointsTests(PostgresTestcontainerFixture fixture)
         Assert.Equal("INSUFFICIENT_BALANCE", error.Code);
     }
 
+    [Fact]
+    public async Task ConcurrentBuys_ForSameUser_AllowExactlyOnePurchase_NoDoubleSpend()
+    {
+        await using var factory = new PostgresWebApplicationFactory(fixture);
+        using var client = factory.CreateClient();
+
+        Guid stockId;
+
+        // Balance affords exactly one buy of 100 shares: naive cost is 100 * price(2) = 200, and
+        // per-order price impact is capped (~10%) plus the bid/ask spread and the service fee — well
+        // under 300. A second buy (another ~200+) is impossible, so at most one trade can ever clear.
+        const decimal startingBalance = 300m;
+        const int quantity = 100;
+        const decimal stockPrice = 2m;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            dbContext.Users.Add(CreateUser(TestUserId, 502003));
+
+            dbContext.Wallets.Add(new Wallet
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                Balance = startingBalance,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            });
+
+            dbContext.Portfolios.Add(new Portfolio
+            {
+                Id = Guid.NewGuid(),
+                UserId = TestUserId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            });
+
+            var trackedPlayer = new TrackedPlayer
+            {
+                Id = Guid.NewGuid(),
+                OsuUserId = 779,
+                Username = "player-779",
+                TrackingTier = TrackingTier.Tier2,
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+            dbContext.TrackedPlayers.Add(trackedPlayer);
+
+            var stock = new PlayerStock
+            {
+                Id = Guid.NewGuid(),
+                TrackedPlayerId = trackedPlayer.Id,
+                CurrentPrice = stockPrice,
+                DemandScore = 1m,
+                PerformanceScore = 1m,
+                CreatedAt = DateTimeOffset.UtcNow,
+                LastUpdated = DateTimeOffset.UtcNow,
+                CreatedBy = "seed"
+            };
+            dbContext.PlayerStocks.Add(stock);
+            stockId = stock.Id;
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        // Fire two identical buys concurrently. Both read the same wallet row version; the wallet is an
+        // optimistic-concurrency entity, so only one commit can win — the loser either fails the
+        // concurrency check (409 Conflict) or, if it re-reads after the winner commits, runs out of
+        // balance (INSUFFICIENT_BALANCE). Either way exactly one purchase clears: no double-spend.
+        var firstBuyTask = client.PostAsJsonAsync(
+            "/api/v1/trading/buy", new TradeRequest(stockId, quantity));
+        var secondBuyTask = client.PostAsJsonAsync(
+            "/api/v1/trading/buy", new TradeRequest(stockId, quantity));
+
+        var responses = await Task.WhenAll(firstBuyTask, secondBuyTask);
+
+        var successes = responses.Where(r => r.IsSuccessStatusCode).ToList();
+        var failures = responses.Where(r => !r.IsSuccessStatusCode).ToList();
+
+        Assert.Single(successes);
+        var failure = Assert.Single(failures);
+
+        if (failure.StatusCode == HttpStatusCode.BadRequest)
+        {
+            // The loser re-read the wallet post-commit and could no longer afford the buy.
+            var error = await failure.Content.ReadFromJsonAsync<ErrorResponse>();
+            Assert.NotNull(error);
+            Assert.Equal("INSUFFICIENT_BALANCE", error.Code);
+        }
+        else
+        {
+            // The loser lost the optimistic-concurrency race on the shared wallet row.
+            Assert.Equal(HttpStatusCode.Conflict, failure.StatusCode);
+        }
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // Exactly one buy trade was recorded.
+            var trades = await dbContext.Trades
+                .AsNoTracking()
+                .Where(x => x.UserId == TestUserId && x.TradeType == TradeType.Buy)
+                .ToListAsync();
+            var trade = Assert.Single(trades);
+
+            var wallet = await dbContext.Wallets.AsNoTracking().SingleAsync(x => x.UserId == TestUserId);
+
+            var ledger = await dbContext.WalletTransactions
+                .AsNoTracking()
+                .Where(x => x.WalletId == wallet.Id)
+                .ToListAsync();
+
+            // Exactly one BuyStock ledger entry — no money created or lost by the rejected request.
+            var buyLedger = Assert.Single(
+                ledger, x => x.TransactionType == WalletTransactionType.BuyStock);
+            Assert.Equal(trade.TotalAmount, buyLedger.Amount);
+
+            var fees = ledger
+                .Where(x => x.TransactionType == WalletTransactionType.TradeFee)
+                .Sum(x => x.Amount);
+            var rewardCredits = ledger
+                .Where(x => x.TransactionType is WalletTransactionType.AchievementReward
+                    or WalletTransactionType.MissionReward)
+                .Sum(x => x.Amount);
+
+            // Final balance reflects exactly one purchase: starting - one trade - its fees + rewards.
+            Assert.Equal(startingBalance - trade.TotalAmount - fees + rewardCredits, wallet.Balance);
+        }
+    }
+
     private static User CreateUser(Guid userId, long osuUserId)
     {
         return new User

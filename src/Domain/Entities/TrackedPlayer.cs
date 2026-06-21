@@ -15,6 +15,7 @@ public sealed class TrackedPlayer
     public string? CreatedBy { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public string? UpdatedBy { get; set; }
+    public DateTimeOffset? LastInactivityDecayAt { get; set; }
 
     public PlayerStock? Stock { get; set; }
     public ICollection<PlayerSnapshot> Snapshots { get; set; } = new List<PlayerSnapshot>();

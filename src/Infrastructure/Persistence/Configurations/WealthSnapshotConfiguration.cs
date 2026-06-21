@@ -21,5 +21,11 @@ internal sealed class WealthSnapshotConfiguration : IEntityTypeConfiguration<Wea
         builder.HasIndex(x => new { x.UserId, x.CapturedAt })
             .IsDescending(false, true)
             .HasDatabaseName("ix_wealth_snapshot_user_captured_desc");
+
+        // Prevents CaptureWealthSnapshots from inserting a duplicate snapshot set
+        // when the job is retried after a successful-but-unacked run.
+        builder.HasIndex(x => new { x.UserId, x.CapturedAt })
+            .IsUnique()
+            .HasDatabaseName("uq_wealth_snapshot_user_captured");
     }
 }

@@ -22,6 +22,7 @@ internal sealed class TrackedPlayerConfiguration : IEntityTypeConfiguration<Trac
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         builder.Property(x => x.UpdatedBy).HasColumnName("updated_by").HasMaxLength(100);
+        builder.Property(x => x.LastInactivityDecayAt).HasColumnName("last_inactivity_decay_at");
 
         builder.HasIndex(x => x.OsuUserId).IsUnique().HasDatabaseName("uq_tracked_players_osu_user_id");
         builder.HasIndex(x => new { x.IsActive, x.TrackingTier, x.Username })
