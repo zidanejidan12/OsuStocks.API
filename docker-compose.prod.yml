@@ -60,6 +60,23 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://prometheus:9090/api/v1/otlp"
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
       OTEL_SERVICE_NAME: "osustocks-api"
+    # The aspnet:9.0 runtime image ships no curl/wget, and /bin/sh (dash) lacks
+    # /dev/tcp; invoke bash explicitly to GET /health and assert a 200 response.
+    healthcheck:
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q '200'"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -81,9 +98,15 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://prometheus:9090/api/v1/otlp"
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
       OTEL_SERVICE_NAME: "osustocks-worker"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      api: { condition: service_healthy }
 
   web:
     # Builds the Next.js frontend from the sibling clone on the server
@@ -106,7 +129,15 @@ services:
       # Server-only proxy target for /api/v1/* — kept internal so API traffic stays on
       # the Docker network and the browser only ever talks to its own origin (no CORS).
       API_PROXY_TARGET: "http://api:8080"
-    depends_on: [api]
+    # node:20-alpine ships wget; probe the Next.js server on its own port.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      api: { condition: service_healthy }
 
   caddy:
     image: caddy:2-alpine
@@ -118,21 +149,30 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [api, grafana]
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+      grafana: { condition: service_started }
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.4.1
     restart: unless-stopped
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--web.enable-otlp-receiver"             # accept app metrics pushed via OTLP
       - "--storage.tsdb.retention.time=30d"      # keep RAM/disk modest on a CX33
+      - "--storage.tsdb.retention.size=4GB"      # hard cap disk so the volume can't fill the host
     volumes:
       - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.6.1
     restart: unless-stopped
     environment:
       GF_SERVER_ROOT_URL: "https://grafana.${DOMAIN:-osustocks.com}"
@@ -143,7 +183,7 @@ services:
     depends_on: [prometheus]
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.9.1
     restart: unless-stopped
     command: ["--path.rootfs=/host"]
     pid: host
@@ -151,14 +191,14 @@ services:
       - "/:/host:ro,rslave"
 
   postgres-exporter:
-    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
     restart: unless-stopped
     environment:
       DATA_SOURCE_NAME: "postgresql://osu_stocks:${POSTGRES_PASSWORD}@postgres:5432/osu_stocks?sslmode=disable"
     depends_on: [postgres]
 
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.74.0
     restart: unless-stopped
     environment:
       REDIS_ADDR: "redis://redis:6379"
