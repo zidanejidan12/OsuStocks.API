@@ -9,6 +9,7 @@ using OsuStocks.Application.Features.Market.GetMarketStocks;
 using OsuStocks.Application.Features.Market.GetStockAnalytics;
 using OsuStocks.Application.Features.Market.GetStockCandles;
 using OsuStocks.Application.Features.Market.GetStockTopPlays;
+using OsuStocks.Application.Features.Market.GetTradeQuote;
 
 namespace OsuStocks.Api.Endpoints;
 
@@ -260,6 +261,34 @@ internal static class MarketEndpoints
                 liquidityTier = result.Value.LiquidityTier,
                 totalShares = result.Value.TotalShares,
                 maxOwnershipPercentage = result.Value.MaxOwnershipPercentage
+            });
+        });
+
+        // Pre-trade estimate: exact fill (slippage + spread) + progressive fee for a given quantity.
+        marketGroup.MapGet("/stocks/{stockId:guid}/quote", async (
+            Guid stockId,
+            decimal quantity,
+            string? side,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var isSell = string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase);
+            var result = await sender.Send(new GetTradeQuoteQuery(stockId, quantity, isSell), cancellationToken);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.Ok(new
+            {
+                quantity = result.Value.Quantity,
+                unitPrice = result.Value.UnitPrice,
+                grossAmount = result.Value.GrossAmount,
+                fee = result.Value.Fee,
+                total = result.Value.Total,
+                newPrice = result.Value.NewPrice,
+                isSell = result.Value.IsSell
             });
         });
 
