@@ -10,4 +10,7 @@ public sealed record CurrentUserProfileResponse(
     string? CountryCode,
     string? CoverUrl,
     string Role,
-    GetInvestorLevelResponse InvestorLevel);
+    GetInvestorLevelResponse InvestorLevel,
+    string? EquippedTitleCode,
+    string? EquippedTitle,
+    IReadOnlyList<string> ShowcasedAchievementCodes);

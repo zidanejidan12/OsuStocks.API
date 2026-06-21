@@ -11,6 +11,11 @@ public sealed class User
     public string? CountryCode { get; set; }
     // osu! profile banner (cover.url). Refreshed on each login.
     public string? ProfileCoverUrl { get; set; }
+    // Profile customization: the achievement whose name is shown as the player's title
+    // (null = fall back to the investor level title), and the achievements pinned to the
+    // profile showcase (ordered, max enforced in the use case). Codes must be unlocked.
+    public string? EquippedTitleCode { get; set; }
+    public List<string> ShowcasedAchievementCodes { get; set; } = [];
     public UserRole Role { get; set; } = UserRole.User;
     public DateTimeOffset CreatedAt { get; set; }
     public string? CreatedBy { get; set; }

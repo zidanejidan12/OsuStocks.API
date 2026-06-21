@@ -107,7 +107,10 @@ internal static class AuthEndpoints
                 countryCode = result.Value.CountryCode,
                 coverUrl = result.Value.CoverUrl,
                 role = result.Value.Role,
-                investorLevel = result.Value.InvestorLevel
+                investorLevel = result.Value.InvestorLevel,
+                equippedTitleCode = result.Value.EquippedTitleCode,
+                equippedTitle = result.Value.EquippedTitle,
+                showcasedAchievementCodes = result.Value.ShowcasedAchievementCodes
             });
         })
         .RequireAuthorization();
