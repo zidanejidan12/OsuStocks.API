@@ -28,7 +28,20 @@ public interface IMarketEventProcessingService
         OsuStocks.Domain.Market.Models.MarketPriceInput input,
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Pure, side-effect-free price calculation for a hypothetical event (no mutation, no staging, no
+    /// save). Uses the same engine + live coefficients as <see cref="ApplyAndStageAsync"/>, so a quote
+    /// matches what an actual trade would do. Powers the pre-trade cost/fee estimate.
+    /// </summary>
+    Task<PricePreview> PreviewAsync(
+        decimal currentPrice,
+        OsuStocks.Domain.Market.Models.MarketPriceInput input,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>The staged (uncommitted) price change plus the liquidity-based spread rate for the trade.</summary>
 public sealed record StagedPriceResult(PriceChanged PriceChange, decimal SpreadRate);
+
+/// <summary>A previewed price move (no side effects): the pre/post price and the bid/ask spread rate.</summary>
+public sealed record PricePreview(decimal PreviousPrice, decimal NewPrice, decimal SpreadRate);

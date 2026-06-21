@@ -87,6 +87,16 @@ public sealed class MarketEventProcessingService(
         return staged.PriceChange;
     }
 
+    public async Task<PricePreview> PreviewAsync(
+        decimal currentPrice,
+        MarketPriceInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var coefficients = await coefficientsProvider.GetCurrentAsync(cancellationToken);
+        var calculation = marketPriceEngine.Calculate(currentPrice, input, coefficients);
+        return new PricePreview(calculation.PreviousPrice, calculation.NewPrice, calculation.SpreadRate);
+    }
+
     private static PriceChangeReason ResolveReason(MarketInputType type)
     {
         return type switch
