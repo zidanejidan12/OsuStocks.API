@@ -15,6 +15,8 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
         // (Postgres handles it fine either way).
         var holdings = await dbContext.Holdings
             .AsNoTracking()
+            .Include(x => x.Stock)
+            .ThenInclude(s => s.TrackedPlayer)
             .Where(x => x.Portfolio.UserId == userId)
             .Select(x => new PortfolioHoldingSummaryReadModel(
                 x.Id,
@@ -38,6 +40,8 @@ internal sealed class PortfolioReadRepository(AppDbContext dbContext) : IPortfol
     {
         var holdings = await dbContext.Holdings
             .AsNoTracking()
+            .Include(x => x.Stock)
+            .ThenInclude(s => s.TrackedPlayer)
             .Where(x => x.Portfolio.UserId == userId)
             .Select(x => new HoldingReadModel(
                 x.Id,

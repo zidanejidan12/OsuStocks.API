@@ -43,7 +43,8 @@ public sealed class InactivityDecayHandlerIntegrationTests
             trackedPlayerRepository,
             snapshotRepository,
             publisher,
-            new StubInactivityDecaySettings(7));
+            new StubInactivityDecaySettings(7),
+            new NoOpApplicationDbContext());
 
         var result = await handler.Handle(new EvaluateInactivityDecayCommand(), CancellationToken.None);
 
@@ -71,7 +72,8 @@ public sealed class InactivityDecayHandlerIntegrationTests
             trackedPlayerRepository,
             snapshotRepository,
             publisher,
-            new StubInactivityDecaySettings(7));
+            new StubInactivityDecaySettings(7),
+            new NoOpApplicationDbContext());
 
         var result = await handler.Handle(new EvaluateInactivityDecayCommand(), CancellationToken.None);
 
@@ -94,7 +96,8 @@ public sealed class InactivityDecayHandlerIntegrationTests
             trackedPlayerRepository,
             snapshotRepository,
             publisher,
-            new StubInactivityDecaySettings(7));
+            new StubInactivityDecaySettings(7),
+            new NoOpApplicationDbContext());
 
         var result = await handler.Handle(new EvaluateInactivityDecayCommand(), CancellationToken.None);
 
@@ -124,7 +127,8 @@ public sealed class InactivityDecayHandlerIntegrationTests
             trackedPlayerRepository,
             snapshotRepository,
             publisher,
-            new StubInactivityDecaySettings(3));
+            new StubInactivityDecaySettings(3),
+            new NoOpApplicationDbContext());
 
         var result = await handler.Handle(new EvaluateInactivityDecayCommand(), CancellationToken.None);
 
@@ -137,7 +141,8 @@ public sealed class InactivityDecayHandlerIntegrationTests
             trackedPlayerRepository,
             snapshotRepository,
             publisher2,
-            new StubInactivityDecaySettings(7));
+            new StubInactivityDecaySettings(7),
+            new NoOpApplicationDbContext());
 
         var result2 = await handler2.Handle(new EvaluateInactivityDecayCommand(), CancellationToken.None);
 

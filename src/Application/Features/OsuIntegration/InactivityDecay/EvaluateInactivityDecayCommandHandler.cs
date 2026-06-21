@@ -11,7 +11,8 @@ public sealed class EvaluateInactivityDecayCommandHandler(
     ITrackedPlayerRepository trackedPlayerRepository,
     IPlayerSnapshotRepository playerSnapshotRepository,
     IPublisher publisher,
-    IInactivityDecaySettings inactivityDecaySettings)
+    IInactivityDecaySettings inactivityDecaySettings,
+    IApplicationDbContext dbContext)
     : IRequestHandler<EvaluateInactivityDecayCommand, Result<EvaluateInactivityDecayResponse>>
 {
     public async Task<Result<EvaluateInactivityDecayResponse>> Handle(
@@ -47,12 +48,23 @@ public sealed class EvaluateInactivityDecayCommandHandler(
                 continue;
             }
 
+            if (player.LastInactivityDecayAt is { } lastDecay
+                && lastDecay.UtcDateTime.Date == now.UtcDateTime.Date)
+            {
+                continue;
+            }
+
             await publisher.Publish(
                 new PlayerInactiveNotification(new PlayerInactive(player.Id, now)),
                 cancellationToken);
 
+            player.LastInactivityDecayAt = now;
+            trackedPlayerRepository.Update(player);
+
             decayCount++;
         }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new EvaluateInactivityDecayResponse(activePlayers.Count, decayCount));
     }

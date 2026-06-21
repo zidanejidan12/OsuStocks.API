@@ -32,11 +32,19 @@ builder.Services.AddCors(options =>
     // overrides in integration tests — is honored. In production this resolves the same appsettings values.
     var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 
+    // Fail closed and loud: outside Development an empty origin allow-list would otherwise silently
+    // reject every browser, which is hard to diagnose. Require an explicit allow-list in production.
+    if (!builder.Environment.IsDevelopment() && corsOrigins.Length == 0)
+    {
+        throw new InvalidOperationException(
+            "Cors:AllowedOrigins must be configured with at least one origin outside Development.");
+    }
+
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(corsOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
+              .WithHeaders("Content-Type", "Authorization")
+              .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
               .AllowCredentials();
     });
 });

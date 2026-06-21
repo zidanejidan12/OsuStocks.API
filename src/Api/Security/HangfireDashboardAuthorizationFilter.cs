@@ -3,8 +3,7 @@ using OsuStocks.Domain.Common.Enums;
 
 namespace OsuStocks.Api.Security;
 
-internal sealed class HangfireDashboardAuthorizationFilter(IHostEnvironment environment)
-    : IDashboardAuthorizationFilter
+internal sealed class HangfireDashboardAuthorizationFilter : IDashboardAuthorizationFilter
 {
     public bool Authorize(DashboardContext context)
     {
@@ -21,6 +20,19 @@ internal sealed class HangfireDashboardAuthorizationFilter(IHostEnvironment envi
             return false;
         }
 
-        return environment.IsDevelopment() || httpContext.Request.IsHttps;
+        // Require HTTPS unconditionally. Plaintext is permitted only for loopback connections
+        // (local development / on-box access), never for remote clients over HTTP.
+        return httpContext.Request.IsHttps || IsLoopback(httpContext);
+    }
+
+    private static bool IsLoopback(HttpContext httpContext)
+    {
+        var connection = httpContext.Connection;
+        var remoteIp = connection.RemoteIpAddress;
+
+        // A missing remote address (e.g. in-memory test server) is treated as loopback.
+        return remoteIp is null
+            || System.Net.IPAddress.IsLoopback(remoteIp)
+            || remoteIp.Equals(connection.LocalIpAddress);
     }
 }

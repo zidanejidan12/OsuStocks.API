@@ -49,13 +49,23 @@ internal static class AuthEndpoints
             // The osu! handshake is a top-level browser navigation, so redirect the browser back to the
             // SPA callback page with the token in the URL fragment (kept out of server logs/history) rather
             // than returning JSON the frontend cannot consume from a full-page navigation.
-            if (!string.IsNullOrWhiteSpace(callback.ReturnUrl))
+            if (!string.IsNullOrWhiteSpace(callback.ReturnUrl)
+                && Uri.TryCreate(callback.ReturnUrl, UriKind.Absolute, out var returnUri))
             {
                 var fragment =
                     $"accessToken={Uri.EscapeDataString(callback.AccessToken)}" +
                     $"&expiresAt={Uri.EscapeDataString(callback.ExpiresAt.ToString("o"))}";
 
-                return Results.Redirect($"{callback.ReturnUrl}#{fragment}");
+                // The returnUrl is origin-validated by OAuthReturnUrlPolicy, but may carry its own
+                // query/fragment. Strip both so the redirect target has exactly one '#' carrying the
+                // token and a pre-existing fragment can't swallow or split the credentials.
+                var baseUrl = new UriBuilder(returnUri)
+                {
+                    Query = string.Empty,
+                    Fragment = string.Empty
+                }.Uri.GetLeftPart(UriPartial.Path);
+
+                return Results.Redirect($"{baseUrl}#{fragment}");
             }
 
             return Results.Ok(new
