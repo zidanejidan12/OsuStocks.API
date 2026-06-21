@@ -18,8 +18,8 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        var stockA = new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, null, 1500m, 1000, 12.5m, null, null);
-        var stockB = new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, null, 1100m, 700, -4.2m, null, null);
+        var stockA = new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, null, 1500m, 1000, 12.5m, null, null, null);
+        var stockB = new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, null, 1100m, 700, -4.2m, null, null, null);
 
         marketRepository.UpsertStock(stockA);
         marketRepository.UpsertStock(stockB);
@@ -44,9 +44,9 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, null, 1500m, 1000, 12m, null, null));
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, null, 1200m, 400, 2m, null, null));
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, null, 900m, 800, -5m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, null, 1500m, 1000, 12m, null, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, null, 1200m, 400, 2m, null, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, null, 900m, 800, -5m, null, null, null));
 
         var response = await client.GetAsync("/api/v1/market/stocks?page=1&pageSize=2&sort=price_desc&search=a");
         response.EnsureSuccessStatusCode();
@@ -69,9 +69,9 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, "AU", 1500m, 1000, 12m, null, null));
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, "US", 1200m, 400, 2m, null, null));
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, "AU", 900m, 800, -5m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, "AU", 1500m, 1000, 12m, null, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, "US", 1200m, 400, 2m, null, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, "AU", 900m, 800, -5m, null, null, null));
 
         // Lower-case to confirm the filter is case-insensitive.
         var response = await client.GetAsync("/api/v1/market/stocks?country=au");
@@ -93,11 +93,11 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, "AU", 1500m, 1000, 12m, null, null));
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, "AU", 900m, 800, -5m, null, null));
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, "US", 1200m, 400, 2m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "mrekk", null, "AU", 1500m, 1000, 12m, null, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "whitecat", null, "AU", 900m, 800, -5m, null, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "aetrna", null, "US", 1200m, 400, 2m, null, null, null));
         // Null/empty country codes are excluded from the aggregation.
-        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 800m, 100, 0m, null, null));
+        marketRepository.UpsertStock(new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 800m, 100, 0m, null, null, null));
 
         var response = await client.GetAsync("/api/v1/market/countries");
         response.EnsureSuccessStatusCode();
@@ -121,7 +121,7 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        var stock = new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 875m, 250, 3.4m, null, null);
+        var stock = new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 875m, 250, 3.4m, null, null, null);
         marketRepository.UpsertStock(stock);
 
         var response = await client.GetAsync($"/api/v1/market/stocks/{stock.StockId}");
@@ -143,7 +143,7 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        var stock = new MarketStockDetailsReadModel(Guid.NewGuid(), "shige", null, null, 1300m, 900, 1.2m, null, null);
+        var stock = new MarketStockDetailsReadModel(Guid.NewGuid(), "shige", null, null, 1300m, 900, 1.2m, null, null, null);
         marketRepository.UpsertStock(stock);
 
         marketRepository.SetHistory(stock.StockId,

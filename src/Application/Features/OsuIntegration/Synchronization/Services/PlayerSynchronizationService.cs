@@ -131,10 +131,12 @@ public sealed class PlayerSynchronizationService(
             // Keep the player's display fields fresh from osu! (avatar + country flag). The tracked
             // entity is read AsNoTracking, so persist via the repository's Update when they change.
             if (trackedPlayer.AvatarUrl != latestProfile.AvatarUrl ||
-                trackedPlayer.CountryCode != latestProfile.CountryCode)
+                trackedPlayer.CountryCode != latestProfile.CountryCode ||
+                trackedPlayer.ProfileCoverUrl != latestProfile.ProfileCoverUrl)
             {
                 trackedPlayer.AvatarUrl = latestProfile.AvatarUrl;
                 trackedPlayer.CountryCode = latestProfile.CountryCode;
+                trackedPlayer.ProfileCoverUrl = latestProfile.ProfileCoverUrl;
                 trackedPlayer.UpdatedAt = now;
                 trackedPlayer.UpdatedBy = "sync";
                 trackedPlayerRepository.Update(trackedPlayer);

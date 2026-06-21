@@ -105,6 +105,7 @@ internal static class AuthEndpoints
                 username = result.Value.Username,
                 avatarUrl = result.Value.AvatarUrl,
                 countryCode = result.Value.CountryCode,
+                coverUrl = result.Value.CoverUrl,
                 role = result.Value.Role,
                 investorLevel = result.Value.InvestorLevel
             });

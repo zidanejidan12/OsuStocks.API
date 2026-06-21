@@ -9,4 +9,5 @@ public sealed record GetMarketStockDetailsResponse(
     long Volume,
     decimal PriceChange24h,
     int? GlobalRank,
-    decimal? CurrentPp);
+    decimal? CurrentPp,
+    string? BannerUrl);

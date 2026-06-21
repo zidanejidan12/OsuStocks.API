@@ -9,6 +9,8 @@ public sealed class TrackedPlayer
     public string Username { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
     public string? CountryCode { get; set; }
+    // osu! profile banner (cover.url). Refreshed during sync; powers the stock-detail banner.
+    public string? ProfileCoverUrl { get; set; }
     public TrackingTier TrackingTier { get; set; } = TrackingTier.Tier3;
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }

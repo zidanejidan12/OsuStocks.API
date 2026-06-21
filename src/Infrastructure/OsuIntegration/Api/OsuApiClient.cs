@@ -96,7 +96,8 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
                 user.Statistics?.GlobalRank,
                 null,
                 null,
-                user.CountryCode))
+                user.CountryCode,
+                ProfileCoverUrl: user.Cover?.CustomUrl ?? user.Cover?.Url))
             .ToList();
     }
 
@@ -130,7 +131,8 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
                 entry.GlobalRank ?? entry.User.Statistics?.GlobalRank,
                 null,
                 null,
-                entry.User.CountryCode))
+                entry.User.CountryCode,
+                ProfileCoverUrl: entry.User.Cover?.CustomUrl ?? entry.User.Cover?.Url))
             .ToList();
     }
 
@@ -157,7 +159,8 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
             topScore?.Pp,
             user.CountryCode,
             topScore?.Beatmapset?.Covers?.Cover2x ?? topScore?.Beatmapset?.Covers?.Cover,
-            topScore?.Beatmapset?.Title);
+            topScore?.Beatmapset?.Title,
+            user.Cover?.CustomUrl ?? user.Cover?.Url);
     }
 
     private async Task<OsuTopScoreResponse?> GetTopScoreInternalAsync(
@@ -234,7 +237,21 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
         [JsonPropertyName("country_code")]
         public string? CountryCode { get; init; }
 
+        [JsonPropertyName("cover")]
+        public OsuCoverResponse? Cover { get; init; }
+
         public OsuStatisticsResponse? Statistics { get; init; }
+    }
+
+    private sealed class OsuCoverResponse
+    {
+        // The osu! profile banner (a.ppy.sh / osu! CDN). `custom_url` is the user-set image;
+        // `url` is the resolved one (custom or a default cover) — prefer whichever is present.
+        [JsonPropertyName("url")]
+        public string? Url { get; init; }
+
+        [JsonPropertyName("custom_url")]
+        public string? CustomUrl { get; init; }
     }
 
     private sealed class OsuStatisticsResponse

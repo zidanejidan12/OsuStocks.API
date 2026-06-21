@@ -144,7 +144,8 @@ internal sealed class MarketReadRepository(
             select new
             {
                 GlobalRank = latest != null ? latest.GlobalRank : null,
-                CurrentPp = latest != null ? (decimal?)latest.CurrentPp : null
+                CurrentPp = latest != null ? (decimal?)latest.CurrentPp : null,
+                stock.TrackedPlayer.ProfileCoverUrl
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -157,7 +158,8 @@ internal sealed class MarketReadRepository(
             row.Volume,
             ComputeChange24h(row),
             rankInfo?.GlobalRank,
-            rankInfo?.CurrentPp);
+            rankInfo?.CurrentPp,
+            rankInfo?.ProfileCoverUrl);
     }
 
     public async Task<IReadOnlyList<MarketStockHistoryPointReadModel>> GetStockHistoryAsync(

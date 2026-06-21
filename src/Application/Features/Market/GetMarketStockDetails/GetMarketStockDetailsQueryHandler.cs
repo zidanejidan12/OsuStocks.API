@@ -39,7 +39,8 @@ public sealed class GetMarketStockDetailsQueryHandler(
                     stock.Volume,
                     stock.PriceChange24h,
                     stock.GlobalRank,
-                    stock.CurrentPp);
+                    stock.CurrentPp,
+                    stock.ProfileCoverUrl);
             },
             cancellationToken);
 

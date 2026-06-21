@@ -10,4 +10,5 @@ public sealed record OsuUserProfile(
     decimal? TopScorePp,
     string? CountryCode = null,
     string? TopScoreCoverUrl = null,
-    string? TopScoreTitle = null);
+    string? TopScoreTitle = null,
+    string? ProfileCoverUrl = null);

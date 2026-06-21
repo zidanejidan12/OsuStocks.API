@@ -9,4 +9,5 @@ public sealed record MarketStockDetailsReadModel(
     long Volume,
     decimal PriceChange24h,
     int? GlobalRank,
-    decimal? CurrentPp);
+    decimal? CurrentPp,
+    string? ProfileCoverUrl);
