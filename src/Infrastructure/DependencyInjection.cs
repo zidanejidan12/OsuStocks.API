@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IHoldingRepository, HoldingRepository>();
         services.AddScoped<ITradeRepository, TradeRepository>();
         services.AddScoped<ITradeReadRepository, TradeReadRepository>();
+        services.AddScoped<IAdminTransactionReadRepository, AdminTransactionReadRepository>();
         services.AddScoped<IPlayerSnapshotRepository, PlayerSnapshotRepository>();
         services.AddScoped<IMarketEventRepository, MarketEventRepository>();
         services.AddScoped<IMarketReadRepository, MarketReadRepository>();
