@@ -12,4 +12,5 @@ public sealed record GetStockAnalyticsResponse(
     decimal Liquidity,
     string LiquidityTier,
     decimal TotalShares,
-    decimal MaxOwnershipPercentage);
+    decimal MaxOwnershipPercentage,
+    decimal ReferenceSupplyShares);

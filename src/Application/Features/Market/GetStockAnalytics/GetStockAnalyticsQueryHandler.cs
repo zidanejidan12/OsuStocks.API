@@ -32,6 +32,7 @@ public sealed class GetStockAnalyticsQueryHandler(
             analytics.Liquidity,
             analytics.LiquidityTier,
             analytics.TotalShares,
-            antiAbuseSettings.MaxOwnershipPercentage));
+            antiAbuseSettings.MaxOwnershipPercentage,
+            antiAbuseSettings.ReferenceSupplyShares));
     }
 }
