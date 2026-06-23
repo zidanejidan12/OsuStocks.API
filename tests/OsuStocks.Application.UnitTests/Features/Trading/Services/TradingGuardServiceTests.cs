@@ -145,7 +145,8 @@ public sealed class TradingGuardServiceTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        var service = CreateService(maxOwnershipPercentage: 25);
+        // referenceSupplyShares: 0 isolates the pure percentage math (no virtual supply).
+        var service = CreateService(maxOwnershipPercentage: 25, referenceSupplyShares: 0);
 
         // Buying 20 shares with 0 existing → 20/(80+20) = 20%
         var result = await service.CheckPositionLimitAsync(
@@ -170,7 +171,8 @@ public sealed class TradingGuardServiceTests
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        var service = CreateService(maxOwnershipPercentage: 25);
+        // referenceSupplyShares: 0 isolates the pure percentage math (no virtual supply).
+        var service = CreateService(maxOwnershipPercentage: 25, referenceSupplyShares: 0);
 
         // User already holds 10, buying 20 more → 30/(60+20) = 37.5%
         var result = await service.CheckPositionLimitAsync(
@@ -184,20 +186,56 @@ public sealed class TradingGuardServiceTests
     }
 
     [Fact]
-    public async Task CheckPositionLimit_FirstBuyer_ReturnsSuccess()
+    public async Task CheckPositionLimit_FirstBuyerWithReferenceSupply_ReturnsSuccess()
     {
-        var service = CreateService(maxOwnershipPercentage: 25);
+        // With a virtual reference supply, a first buyer on a brand-new stock (real float 0)
+        // is measured against (0 + reference). Buying 10 with reference 100 → 10/(100+10) = 9.1% ≤ 25%.
+        // This replaces the old "first buyer bypasses the cap entirely" rule.
+        var service = CreateService(maxOwnershipPercentage: 25, referenceSupplyShares: 100);
 
-        // No existing holdings, buying 10 → 10/10 = 100% but total is just the buyer
         var result = await service.CheckPositionLimitAsync(
             Guid.NewGuid(), Guid.NewGuid(), 10, 0);
 
-        // First buyer is allowed (total supply = 0 + 10, user = 10, 100% > 25%)
-        // but this is the only way to start trading, so we allow it when projected total = projected user
-        // Actually: 10/10 = 100% which exceeds 25%. Let's verify the behavior.
-        // The service should block this. But for a brand new stock, no one can buy.
-        // We need to think about this: if total supply is 0, first buyer always gets 100%.
-        // The fix: position limit only applies when there's existing supply.
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task CheckPositionLimit_FirstBuyerHugeQuantity_ExceedsLimit()
+    {
+        // The reference supply also caps the FIRST buyer (closing the old "first buyer can own 100%"
+        // hole): buying 1000 on an empty stock with reference 100 → 1000/(100+1000) = 90.9% > 25%.
+        var service = CreateService(maxOwnershipPercentage: 25, referenceSupplyShares: 100);
+
+        var result = await service.CheckPositionLimitAsync(
+            Guid.NewGuid(), Guid.NewGuid(), 1000, 0);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("POSITION_LIMIT_EXCEEDED", result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task CheckPositionLimit_ThinStock_AllowsAdditionalBuyers()
+    {
+        var stockId = Guid.NewGuid();
+
+        // A "gatekept" stock: someone bought only 2 shares, so the real float is 2.
+        await _holdingRepo.AddAsync(new Holding
+        {
+            Id = Guid.NewGuid(),
+            PortfolioId = Guid.NewGuid(),
+            StockId = stockId,
+            Quantity = 2,
+            AveragePrice = 100,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        var service = CreateService(maxOwnershipPercentage: 25, referenceSupplyShares: 100);
+
+        // A new buyer takes 20 shares → 20/(2+100+20) = 16.4% ≤ 25%, so it's allowed.
+        // (Under the old float-only formula this was 20/(2+20) = 90.9% and would be blocked.)
+        var result = await service.CheckPositionLimitAsync(
+            Guid.NewGuid(), stockId, 20, 0);
+
         Assert.True(result.IsSuccess);
     }
 
@@ -251,6 +289,7 @@ public sealed class TradingGuardServiceTests
 
     private TradingGuardService CreateService(
         decimal maxOwnershipPercentage = 25,
+        decimal referenceSupplyShares = 100,
         int cooldownSeconds = 30,
         int rapidTradeWindowSeconds = 300,
         int rapidTradeThreshold = 10)
@@ -258,17 +297,19 @@ public sealed class TradingGuardServiceTests
         return new TradingGuardService(
             _tradeRepo,
             _holdingRepo,
-            new StubAntiAbuseSettings(maxOwnershipPercentage, cooldownSeconds, rapidTradeWindowSeconds, rapidTradeThreshold),
+            new StubAntiAbuseSettings(maxOwnershipPercentage, referenceSupplyShares, cooldownSeconds, rapidTradeWindowSeconds, rapidTradeThreshold),
             NullLogger<TradingGuardService>.Instance);
     }
 
     private sealed class StubAntiAbuseSettings(
         decimal maxOwnershipPercentage,
+        decimal referenceSupplyShares,
         int tradeCooldownSeconds,
         int rapidTradeWindowSeconds,
         int rapidTradeThreshold) : IAntiAbuseSettings
     {
         public decimal MaxOwnershipPercentage => maxOwnershipPercentage;
+        public decimal ReferenceSupplyShares => referenceSupplyShares;
         public int TradeCooldownSeconds => tradeCooldownSeconds;
         public int RapidTradeWindowSeconds => rapidTradeWindowSeconds;
         public int RapidTradeThreshold => rapidTradeThreshold;

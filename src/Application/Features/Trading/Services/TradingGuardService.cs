@@ -60,13 +60,16 @@ public sealed class TradingGuardService(
 
         var totalSupply = await holdingRepository.GetTotalQuantityByStockAsync(stockId, cancellationToken);
 
-        // Position limit only applies when there is existing supply from other users
-        if (totalSupply == 0)
-        {
-            return Result.Success();
-        }
+        // The cap is enforced against the real float PLUS a virtual reference supply. This removes
+        // the "gatekeeping" deadlock on thin stocks: when the real float is tiny, MaxOwnershipPercentage
+        // of it is near zero, so without the reference supply the first buyer could hold ~100% and lock
+        // everyone else out. With it, every trader (including the first) gets a meaningful allowance on a
+        // new stock, and the cap tapers to the true percentage once the float grows past the reference.
+        // No first-buyer bypass is needed — the reference supply keeps the first buy from reaching 100%.
+        var referenceSupply = Math.Max(0m, antiAbuseSettings.ReferenceSupplyShares);
+        var effectiveSupply = totalSupply + referenceSupply;
 
-        var projectedTotal = totalSupply + requestedQuantity;
+        var projectedTotal = effectiveSupply + requestedQuantity;
         var projectedUserHolding = currentHoldingQuantity + requestedQuantity;
 
         var ownershipPercentage = (decimal)projectedUserHolding / projectedTotal * 100;
@@ -74,13 +77,13 @@ public sealed class TradingGuardService(
         if (ownershipPercentage > maxPercentage)
         {
             logger.LogWarning(
-                "Position limit exceeded. UserId={UserId}, StockId={StockId}, CurrentHolding={CurrentHolding}, RequestedQuantity={RequestedQuantity}, TotalSupply={TotalSupply}, OwnershipPercent={OwnershipPercent:F1}, MaxPercent={MaxPercent}",
-                userId, stockId, currentHoldingQuantity, requestedQuantity, totalSupply, ownershipPercentage, maxPercentage);
+                "Position limit exceeded. UserId={UserId}, StockId={StockId}, CurrentHolding={CurrentHolding}, RequestedQuantity={RequestedQuantity}, TotalSupply={TotalSupply}, ReferenceSupply={ReferenceSupply}, OwnershipPercent={OwnershipPercent:F1}, MaxPercent={MaxPercent}",
+                userId, stockId, currentHoldingQuantity, requestedQuantity, totalSupply, referenceSupply, ownershipPercentage, maxPercentage);
 
-            // Largest extra quantity q that keeps (current + q) / (supply + q) <= p, where p = maxPercentage/100.
+            // Largest extra quantity q that keeps (current + q) / (effectiveSupply + q) <= p, where p = maxPercentage/100.
             // Shares trade to 2 dp, so floor — the suggested amount must never itself trip the limit.
             var fraction = maxPercentage / 100m;
-            var maxAdditionalRaw = (fraction * totalSupply - currentHoldingQuantity) / (1m - fraction);
+            var maxAdditionalRaw = (fraction * effectiveSupply - currentHoldingQuantity) / (1m - fraction);
             var maxAdditional = maxAdditionalRaw <= 0m
                 ? 0m
                 : Math.Floor(maxAdditionalRaw * 100m) / 100m;
