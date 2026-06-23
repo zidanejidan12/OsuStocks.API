@@ -260,7 +260,8 @@ internal static class MarketEndpoints
                 liquidity = result.Value.Liquidity,
                 liquidityTier = result.Value.LiquidityTier,
                 totalShares = result.Value.TotalShares,
-                maxOwnershipPercentage = result.Value.MaxOwnershipPercentage
+                maxOwnershipPercentage = result.Value.MaxOwnershipPercentage,
+                referenceSupplyShares = result.Value.ReferenceSupplyShares
             });
         });
 
