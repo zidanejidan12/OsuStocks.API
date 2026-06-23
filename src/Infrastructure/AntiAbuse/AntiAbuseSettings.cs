@@ -6,6 +6,7 @@ namespace OsuStocks.Infrastructure.AntiAbuse;
 internal sealed class AntiAbuseSettings(IOptions<AntiAbuseOptions> options) : IAntiAbuseSettings
 {
     public decimal MaxOwnershipPercentage => options.Value.MaxOwnershipPercentage;
+    public decimal ReferenceSupplyShares => options.Value.ReferenceSupplyShares;
     public int TradeCooldownSeconds => options.Value.TradeCooldownSeconds;
     public int RapidTradeWindowSeconds => options.Value.RapidTradeWindowSeconds;
     public int RapidTradeThreshold => options.Value.RapidTradeThreshold;
