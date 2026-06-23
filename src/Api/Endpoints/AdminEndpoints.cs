@@ -4,6 +4,8 @@ using MediatR;
 using OsuStocks.Api.Common;
 using OsuStocks.Application.Features.Admin.MarketSettings.GetMarketSettings;
 using OsuStocks.Application.Features.Admin.MarketSettings.UpdateMarketSettings;
+using OsuStocks.Application.Features.Admin.TransactionMonitor.GetAdminTrades;
+using OsuStocks.Application.Features.Admin.TransactionMonitor.GetAdminWalletTransactions;
 using OsuStocks.Application.Features.PlayerRegistry.AddTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.DeleteTrackedPlayer;
 using OsuStocks.Application.Features.PlayerRegistry.DisableTrackedPlayer;
@@ -212,6 +214,67 @@ internal static class AdminEndpoints
             }
 
             return Results.NoContent();
+        });
+
+        // Read-only transaction monitor: trades and the wallet ledger across all users,
+        // filterable by user/stock/type/date and paginated.
+        var transactionsGroup = adminGroup.MapGroup("/transactions");
+
+        transactionsGroup.MapGet("/trades", async (
+            Guid? userId,
+            Guid? stockId,
+            TradeType? tradeType,
+            DateTimeOffset? from,
+            DateTimeOffset? to,
+            int? page,
+            int? pageSize,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(
+                new GetAdminTradesQuery(userId, stockId, tradeType, from, to, page ?? 1, pageSize ?? 25),
+                cancellationToken);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.Ok(new
+            {
+                items = result.Value.Items,
+                totalCount = result.Value.TotalCount,
+                page = result.Value.Page,
+                pageSize = result.Value.PageSize
+            });
+        });
+
+        transactionsGroup.MapGet("/wallet", async (
+            Guid? userId,
+            WalletTransactionType? type,
+            DateTimeOffset? from,
+            DateTimeOffset? to,
+            int? page,
+            int? pageSize,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(
+                new GetAdminWalletTransactionsQuery(userId, type, from, to, page ?? 1, pageSize ?? 25),
+                cancellationToken);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            return Results.Ok(new
+            {
+                items = result.Value.Items,
+                totalCount = result.Value.TotalCount,
+                page = result.Value.Page,
+                pageSize = result.Value.PageSize
+            });
         });
     }
 }
