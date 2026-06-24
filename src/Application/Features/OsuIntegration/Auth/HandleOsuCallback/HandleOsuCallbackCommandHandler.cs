@@ -15,6 +15,7 @@ public sealed class HandleOsuCallbackCommandHandler(
     IOsuApiClient osuApiClient,
     IOsuTokenManager osuTokenManager,
     IAppTokenService appTokenService,
+    IRefreshTokenService refreshTokenService,
     IUserRepository userRepository,
     IWalletRepository walletRepository,
     IWalletTransactionRepository walletTransactionRepository,
@@ -45,7 +46,12 @@ public sealed class HandleOsuCallbackCommandHandler(
         try
         {
             var osuToken = await osuOAuthService.ExchangeCodeForTokenAsync(request.Code, cancellationToken);
-            var osuUser = await osuApiClient.GetCurrentUserAsync(osuToken.AccessToken, cancellationToken);
+            // Login only needs the profile (name/avatar/country/cover); skip the top-score fetch so a
+            // sign-in is a single osu! call and a 429 on the optional score can't fail the login.
+            var osuUser = await osuApiClient.GetCurrentUserAsync(
+                osuToken.AccessToken,
+                includeTopScore: false,
+                cancellationToken);
 
             var user = await userRepository.GetByOsuUserIdAsync(osuUser.OsuUserId, cancellationToken);
             if (user is null)
@@ -129,7 +135,13 @@ public sealed class HandleOsuCallbackCommandHandler(
             }
 
             var appToken = appTokenService.CreateToken(user.Id, user.OsuUserId, user.Username, user.Role);
-            return Result.Success(new HandleOsuCallbackResponse(appToken.AccessToken, appToken.ExpiresAt, oauthState.ReturnUrl));
+            var refreshToken = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
+            return Result.Success(new HandleOsuCallbackResponse(
+                appToken.AccessToken,
+                appToken.ExpiresAt,
+                refreshToken.Token,
+                refreshToken.ExpiresAt,
+                oauthState.ReturnUrl));
         }
         catch (HttpRequestException)
         {

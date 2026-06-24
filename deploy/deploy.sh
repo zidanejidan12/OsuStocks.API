@@ -6,7 +6,8 @@
 #   ./deploy/deploy.sh              pull both repos, rebuild + recreate api/worker/web, health-check
 #   ./deploy/deploy.sh --migrate    ...and apply EF migrations (use when a merged PR adds one)
 #   ./deploy/deploy.sh --no-pull     deploy the current checkout without git pull
-#   ./deploy/deploy.sh --caddy       also force-recreate caddy (needed after editing deploy/Caddyfile)
+#   ./deploy/deploy.sh --caddy       also rebuild + recreate caddy (needed after editing
+#                                    deploy/Caddyfile or deploy/Caddy.Dockerfile)
 #
 # Run from anywhere; it locates the repo from its own path. The web repo is
 # expected as a sibling (../OsuStocks.Web); override with WEB_DIR=/path.
@@ -62,9 +63,11 @@ echo "==> Starting/recreating the stack"
 "${COMPOSE[@]}" up -d
 
 if [ "$CADDY" -eq 1 ]; then
-  # Caddy mounts deploy/Caddyfile as a single file; after git replaces it the inode
-  # is stale, so a plain reload re-reads the old config — force a recreate.
-  echo "==> Recreating caddy (picks up Caddyfile changes)"
+  # Caddy is now a custom build (rate-limit + WAF plugins), so rebuild it. The Caddyfile is a
+  # bind-mounted single file; after git replaces it the inode is stale, so a plain reload re-reads
+  # the old config. --build picks up Dockerfile/plugin changes and --force-recreate the new config.
+  echo "==> Rebuilding + recreating caddy (picks up Caddyfile / Caddy.Dockerfile changes)"
+  "${COMPOSE[@]}" build caddy
   "${COMPOSE[@]}" up -d --force-recreate caddy
 fi
 

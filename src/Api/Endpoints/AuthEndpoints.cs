@@ -4,6 +4,7 @@ using OsuStocks.Api.Common;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetCurrentUserProfile;
 using OsuStocks.Application.Features.OsuIntegration.Auth.GetOsuLoginUrl;
 using OsuStocks.Application.Features.OsuIntegration.Auth.HandleOsuCallback;
+using OsuStocks.Application.Features.OsuIntegration.Auth.RefreshToken;
 using static OsuStocks.Api.Common.EndpointAuth;
 
 namespace OsuStocks.Api.Endpoints;
@@ -57,7 +58,9 @@ internal static class AuthEndpoints
             {
                 var fragment =
                     $"accessToken={Uri.EscapeDataString(callback.AccessToken)}" +
-                    $"&expiresAt={Uri.EscapeDataString(callback.ExpiresAt.ToString("o"))}";
+                    $"&expiresAt={Uri.EscapeDataString(callback.ExpiresAt.ToString("o"))}" +
+                    $"&refreshToken={Uri.EscapeDataString(callback.RefreshToken)}" +
+                    $"&refreshExpiresAt={Uri.EscapeDataString(callback.RefreshExpiresAt.ToString("o"))}";
 
                 // The returnUrl is origin-validated by OAuthReturnUrlPolicy, but may carry its own
                 // query/fragment. Strip both so the redirect target has exactly one '#' carrying the
@@ -75,10 +78,42 @@ internal static class AuthEndpoints
             {
                 accessToken = callback.AccessToken,
                 expiresAt = callback.ExpiresAt,
+                refreshToken = callback.RefreshToken,
+                refreshExpiresAt = callback.RefreshExpiresAt,
                 returnUrl = callback.ReturnUrl
             });
         })
         .RequireRateLimiting("auth");
+
+        // Silent session renewal: exchange a (single-use, rotating) refresh token for a fresh access JWT
+        // so the SPA never bounces the user back through osu! OAuth mid-session. Anonymous — the access
+        // token is allowed to be expired here; the refresh token itself is the credential. Uses its own
+        // generous per-IP limiter so proactive refresh + 401 retries never trip the strict login budget.
+        authGroup.MapPost("/refresh", async (
+            RefreshTokenRequest? body,
+            ISender sender,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sender.Send(
+                new RefreshTokenCommand(body?.RefreshToken ?? string.Empty),
+                cancellationToken);
+
+            if (!result.IsSuccess || result.Value is null)
+            {
+                return result.Error!.ToErrorResult(httpContext);
+            }
+
+            var refreshed = result.Value;
+            return Results.Ok(new
+            {
+                accessToken = refreshed.AccessToken,
+                expiresAt = refreshed.ExpiresAt,
+                refreshToken = refreshed.RefreshToken,
+                refreshExpiresAt = refreshed.RefreshExpiresAt
+            });
+        })
+        .RequireRateLimiting("auth-refresh");
 
         authGroup.MapGet("/me", async (
             ClaimsPrincipal principal,
@@ -119,4 +154,6 @@ internal static class AuthEndpoints
         })
         .RequireAuthorization();
     }
+
+    internal sealed record RefreshTokenRequest(string? RefreshToken);
 }

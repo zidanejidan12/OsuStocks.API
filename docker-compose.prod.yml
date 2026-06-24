@@ -140,7 +140,11 @@ services:
       api: { condition: service_healthy }
 
   caddy:
-    image: caddy:2-alpine
+    # Custom build: stock caddy has no rate limiter or WAF. deploy/Caddy.Dockerfile bakes in the
+    # caddy-ratelimit + Coraza (OWASP CRS) plugins. Rebuild via `deploy/deploy.sh --caddy`.
+    build:
+      context: .
+      dockerfile: deploy/Caddy.Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"

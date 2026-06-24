@@ -10,11 +10,14 @@ internal sealed class OsuApiClient(HttpClient httpClient) : IOsuApiClient
 {
     public Task<OsuUserProfile> GetCurrentUserAsync(
         string accessToken,
+        bool includeTopScore = true,
         CancellationToken cancellationToken = default)
     {
         // Always the osu! standard ruleset — otherwise the user's default mode (taiko/fruits/mania)
         // is returned and we'd track the wrong pp/rank for players who default to another mode.
-        return GetUserInternalAsync("me/osu", accessToken, includeTopScore: true, cancellationToken);
+        // Login passes includeTopScore: false: the callback never reads the top score, and skipping it
+        // halves the osu! calls per sign-in (and avoids a 429 on the optional call failing the login).
+        return GetUserInternalAsync("me/osu", accessToken, includeTopScore, cancellationToken);
     }
 
     public Task<OsuUserProfile> GetUserAsync(

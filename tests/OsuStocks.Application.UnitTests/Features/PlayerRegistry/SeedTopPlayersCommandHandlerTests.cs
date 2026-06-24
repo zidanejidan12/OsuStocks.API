@@ -138,7 +138,7 @@ public sealed class SeedTopPlayersCommandHandlerTests
             return Task.FromResult<IReadOnlyList<OsuUserProfile>>(pageItems);
         }
 
-        public Task<OsuUserProfile> GetCurrentUserAsync(string accessToken, CancellationToken cancellationToken = default) =>
+        public Task<OsuUserProfile> GetCurrentUserAsync(string accessToken, bool includeTopScore = true, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<OsuUserProfile> GetUserAsync(long osuUserId, string accessToken, bool includeTopScore = true, CancellationToken cancellationToken = default) =>

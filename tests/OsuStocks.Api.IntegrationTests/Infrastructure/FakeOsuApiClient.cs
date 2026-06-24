@@ -13,7 +13,10 @@ internal sealed class FakeOsuApiClient : IOsuApiClient
         new OsuUserProfile(1003, "vaxei", "https://avatar.example/vaxei", 10_500m, 4, null, null)
     ];
 
-    public Task<OsuUserProfile> GetCurrentUserAsync(string accessToken, CancellationToken cancellationToken = default)
+    public Task<OsuUserProfile> GetCurrentUserAsync(
+        string accessToken,
+        bool includeTopScore = true,
+        CancellationToken cancellationToken = default)
     {
         return Task.FromResult(Users[0]);
     }

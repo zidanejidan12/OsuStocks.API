@@ -104,6 +104,30 @@ that user — generate a dedicated deploy key and add its public half to
 - `https://osustocks.com` loads the frontend; `https://app.osustocks.com` 301s to it.
 - `https://grafana.osustocks.com` → log in as `admin` / `GRAFANA_ADMIN_PASSWORD`.
 
+## Edge hardening (Caddy)
+
+Caddy is a **custom build** (`deploy/Caddy.Dockerfile`, via `xcaddy`) bundling the
+`caddy-ratelimit` and Coraza (OWASP CRS) WAF plugins; stock Caddy ships neither. Configured in
+`deploy/Caddyfile`:
+
+- **Global per-IP rate limit** on every route — `api.` 120 req/min, apex 240 req/min, keyed by
+  client IP. This is the blanket backstop in front of the app's own per-IP limits (which only cover
+  `/auth` and `/trading`).
+- **Body + header size caps** — 1 MB request body, 16 KB headers (the API only takes small JSON).
+- **WAF (OWASP Core Rule Set via Coraza)** — starts in **`DetectionOnly`** so it *logs* attacks
+  without blocking. Once `docker compose -f docker-compose.prod.yml logs caddy` looks clean of
+  false positives, flip `SecRuleEngine DetectionOnly` → `On` in `deploy/Caddyfile` and redeploy.
+- **Bot / User-Agent filtering** — known scanners (sqlmap, nikto, nuclei, …) and empty
+  User-Agents get a `403`. fail2ban (installed by `scripts/server-bootstrap.sh`) remains the
+  host-level complement. `grafana.` is intentionally left un-hardened (own auth; WAF/UA rules can
+  break its API/websocket traffic).
+
+Apply changes with `./deploy/deploy.sh --caddy` (now rebuilds the image **and** force-recreates the
+container). **Validate before deploying:**
+`caddy validate --config deploy/Caddyfile --adapter caddyfile` (or `caddy adapt`). All limits/sizes
+are tunable; if the custom build fails on a plugin version, pin/adjust the module versions in
+`deploy/Caddy.Dockerfile`.
+
 ## Backups
 The `db-backup` sidecar runs a nightly `pg_dump` into the `postgres_backups` volume,
 keeping 7 daily / 4 weekly / 6 monthly copies. Force one / list / restore:

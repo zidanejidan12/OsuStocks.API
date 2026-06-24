@@ -1,15 +1,78 @@
-# deploy/Caddyfile — automatic HTTPS (Let's Encrypt) for OsuStocks.
+# deploy/Caddyfile — automatic HTTPS (Let's Encrypt) + edge hardening for OsuStocks.
 # Caddy provisions + renews certs automatically. Replace the email below.
+#
+# Edge hardening (all values are tunable):
+#   - Global per-IP rate limit on every route (defense-in-depth in front of the app's own
+#     per-IP auth/trading limiters, which only cover a few endpoints).
+#   - Request body + header size caps (the API only ever receives small JSON).
+#   - OWASP Core Rule Set WAF via Coraza, started in DetectionOnly so it LOGS attacks without
+#     blocking real players. Flip `SecRuleEngine DetectionOnly` to `On` once the logs look clean.
+#   - Bot/User-Agent filtering: known scanners and empty User-Agents get a 403.
+#
+# Requires the custom Caddy build in deploy/Caddy.Dockerfile (rate_limit + coraza_waf plugins).
+# Validate changes before deploying:  caddy validate --config deploy/Caddyfile --adapter caddyfile
 {
     email admin@osustocks.com
+
+    # Plugin directives are not in Caddy's default order, so place them explicitly.
+    order coraza_waf first
+    order rate_limit before reverse_proxy
+
+    servers {
+        # Cap request header size; a stable ceiling against header-bomb abuse.
+        max_header_bytes 16384
+    }
+}
+
+# Shared edge hardening. Wrapped in `route` so directives run in the written order (bot block first,
+# then WAF), which `import` into each public site below. Static assets/observability stay lean.
+(harden) {
+    route {
+        # 1) Drop known scanners/scrapers and empty User-Agents before anything else.
+        @badbots header_regexp User-Agent (?i)(sqlmap|nikto|nmap|masscan|zgrab|nuclei|acunetix|wpscan|netsparker|fimap|dirbuster|gobuster|httrack)
+        respond @badbots 403
+
+        @empty_ua {
+            not header_regexp User-Agent .+
+        }
+        respond @empty_ua 403
+
+        # 2) OWASP CRS WAF (detection-first — logs, does not block, until SecRuleEngine is set to On).
+        coraza_waf {
+            directives `
+                Include @coraza.conf-recommended
+                Include @crs-setup.conf.example
+                Include @owasp_crs/*.conf
+                SecRuleEngine DetectionOnly
+            `
+        }
+    }
+
+    # 3) Reject oversized request bodies early (small-JSON API; the SPA never uploads).
+    request_body {
+        max_size 1MB
+    }
 }
 
 # Backend API
 api.osustocks.com {
+    import harden
+
+    # Global per-IP cap across every API route. The app adds stricter per-IP limits on
+    # /auth and /trading; this is the blanket backstop for everything else.
+    rate_limit {
+        zone api {
+            key {remote_host}
+            events 120
+            window 1m
+        }
+    }
+
     reverse_proxy api:8080
 }
 
-# Grafana (observability) — the only other public surface.
+# Grafana (observability) — the only other public surface. Left un-hardened: Grafana has its own
+# auth, and the WAF/UA rules can interfere with its API/websocket traffic.
 grafana.osustocks.com {
     reverse_proxy grafana:3000
 }
@@ -18,6 +81,16 @@ grafana.osustocks.com {
 # Requires an A record for the apex `osustocks.com` pointing at this server so
 # Caddy can issue its cert.
 osustocks.com {
+    import harden
+
+    rate_limit {
+        zone web {
+            key {remote_host}
+            events 240
+            window 1m
+        }
+    }
+
     reverse_proxy web:3000
 }
 

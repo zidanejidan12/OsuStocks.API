@@ -4,7 +4,10 @@ namespace OsuStocks.Domain.OsuIntegration.Interfaces;
 
 public interface IOsuApiClient
 {
-    Task<OsuUserProfile> GetCurrentUserAsync(string accessToken, CancellationToken cancellationToken = default);
+    Task<OsuUserProfile> GetCurrentUserAsync(
+        string accessToken,
+        bool includeTopScore = true,
+        CancellationToken cancellationToken = default);
 
     Task<OsuUserProfile> GetUserAsync(
         long osuUserId,

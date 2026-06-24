@@ -65,6 +65,9 @@ internal sealed class PostgresWebApplicationFactory(
             services.AddSingleton<InMemoryOsuTokenManager>();
             services.AddSingleton<IOsuTokenManager>(provider => provider.GetRequiredService<InMemoryOsuTokenManager>());
 
+            services.RemoveAll<IRefreshTokenService>();
+            services.AddSingleton<IRefreshTokenService, InMemoryRefreshTokenService>();
+
             services.RemoveAll<IOsuOAuthService>();
             services.RemoveAll<IOsuApiClient>();
             services.AddSingleton<IOsuOAuthService, FakeOsuOAuthService>();

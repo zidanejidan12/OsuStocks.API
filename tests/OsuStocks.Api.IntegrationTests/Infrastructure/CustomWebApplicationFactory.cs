@@ -106,6 +106,11 @@ internal sealed class CustomWebApplicationFactory(IDictionary<string, string?>? 
             services.AddSingleton<InMemoryOsuTokenManager>();
             services.AddSingleton<IOsuTokenManager>(provider => provider.GetRequiredService<InMemoryOsuTokenManager>());
 
+            // Replace the Redis-backed refresh-token store so the auth callback issues tokens in-memory
+            // and tests don't require a running Redis.
+            services.RemoveAll<IRefreshTokenService>();
+            services.AddSingleton<IRefreshTokenService, InMemoryRefreshTokenService>();
+
             services.RemoveAll<IDailyLoginRewardRepository>();
             services.AddSingleton<InMemoryDailyLoginRewardRepository>();
             services.AddSingleton<IDailyLoginRewardRepository>(provider => provider.GetRequiredService<InMemoryDailyLoginRewardRepository>());

@@ -107,6 +107,7 @@ public static class DependencyInjection
 
         services.AddScoped<IOsuTokenManager, DistributedOsuTokenManager>();
         services.AddScoped<IAppTokenService, JwtAppTokenService>();
+        services.AddScoped<IRefreshTokenService, RedisRefreshTokenService>();
         services.AddSingleton<IOAuthReturnUrlPolicy, OAuthReturnUrlPolicy>();
 
         services.AddScoped<OsuSynchronizationRecurringJob>();
@@ -118,11 +119,21 @@ public static class DependencyInjection
         services.AddScoped<EconomyMetricsRecurringJob>();
         services.AddSingleton<IOsuSynchronizationRecurringJobRegistrar, OsuSynchronizationRecurringJobRegistrar>();
 
-        services.AddHttpClient<IOsuOAuthService, OsuOAuthService>();
-
         services.AddSingleton<OsuApiRateLimiter>();
         services.AddTransient<OsuApiRateLimitingHandler>();
+        services.AddTransient<OsuApiRetryHandler>();
         services.AddOsuApiObservability(configuration);
+
+        // The OAuth token endpoint shares osu!'s per-app budget, so route it through the same throttle
+        // queue (previously it bypassed the limiter entirely, which let concurrent logins/syncs stampede
+        // /oauth/token). Retry is the OUTER handler so a retried request re-acquires a permit; a 15s
+        // timeout replaces the 100s default so a slow osu! never hangs a login.
+        services.AddHttpClient<IOsuOAuthService, OsuOAuthService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        })
+        .AddHttpMessageHandler<OsuApiRetryHandler>()
+        .AddHttpMessageHandler<OsuApiRateLimitingHandler>();
 
         services.AddHttpClient<IOsuApiClient, OsuApiClient>((serviceProvider, client) =>
         {
@@ -137,9 +148,11 @@ public static class DependencyInjection
             }
 
             client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+            client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         })
+        .AddHttpMessageHandler<OsuApiRetryHandler>()
         .AddHttpMessageHandler<OsuApiRateLimitingHandler>();
 
         services.AddStackExchangeRedisCache(options =>

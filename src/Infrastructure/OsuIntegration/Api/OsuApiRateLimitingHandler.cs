@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using OsuStocks.Infrastructure.OsuIntegration.Telemetry;
 
 namespace OsuStocks.Infrastructure.OsuIntegration.Api;
@@ -11,7 +12,8 @@ namespace OsuStocks.Infrastructure.OsuIntegration.Api;
 /// </summary>
 internal sealed class OsuApiRateLimitingHandler(
     OsuApiRateLimiter rateLimiter,
-    OsuApiTelemetry telemetry) : DelegatingHandler
+    OsuApiTelemetry telemetry,
+    ILogger<OsuApiRateLimitingHandler> logger) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -24,6 +26,11 @@ internal sealed class OsuApiRateLimitingHandler(
         if (!lease.IsAcquired)
         {
             telemetry.RecordRequest("rejected", statusCode: null, durationMs: 0);
+            logger.LogWarning(
+                "osu! API rate limiter rejected {Method} {Url}: the throttle queue is full. " +
+                "Consider lowering request volume or raising OsuApi:RequestsPerMinute / RateLimitQueueLimit.",
+                request.Method,
+                request.RequestUri);
             throw new HttpRequestException(
                 "osu! API rate limiter rejected the request: the throttle queue is full.");
         }

@@ -1,16 +1,28 @@
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using OsuStocks.Domain.OsuIntegration.Interfaces;
 using OsuStocks.Domain.OsuIntegration.Models;
 using OsuStocks.Infrastructure.OsuIntegration.Options;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace OsuStocks.Infrastructure.OsuIntegration.OAuth;
 
-internal sealed class OsuOAuthService(HttpClient httpClient, IOptions<OsuOAuthOptions> options)
+internal sealed class OsuOAuthService(
+    HttpClient httpClient,
+    IOptions<OsuOAuthOptions> options,
+    IDistributedCache cache)
     : IOsuOAuthService
 {
+    // The app-wide client-credentials token is identical for every caller, so cache it once instead
+    // of POSTing /oauth/token on every sync cycle (which multiplied token-endpoint load and risked 429s).
+    private const string ClientCredentialsCacheKey = "osu:client-token";
+
+    // Refresh slightly before expiry so an in-flight request never races a just-expired token.
+    private static readonly TimeSpan ExpiryGuard = TimeSpan.FromSeconds(60);
+
     private readonly OsuOAuthOptions _options = options.Value;
 
     public string BuildAuthorizationUrl(string state)
@@ -57,6 +69,12 @@ internal sealed class OsuOAuthService(HttpClient httpClient, IOptions<OsuOAuthOp
     public async Task<OsuOAuthToken> GetClientCredentialsTokenAsync(
         CancellationToken cancellationToken = default)
     {
+        var cached = await TryGetCachedClientTokenAsync(cancellationToken);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
         EnsureOAuthOptions();
 
         var requestData = new Dictionary<string, string>
@@ -67,7 +85,58 @@ internal sealed class OsuOAuthService(HttpClient httpClient, IOptions<OsuOAuthOp
             ["scope"] = string.Join(' ', _options.Scopes.Where(static value => !string.IsNullOrWhiteSpace(value)))
         };
 
-        return await ExchangeTokenAsync(requestData, cancellationToken);
+        var token = await ExchangeTokenAsync(requestData, cancellationToken);
+        await CacheClientTokenAsync(token, cancellationToken);
+        return token;
+    }
+
+    private async Task<OsuOAuthToken?> TryGetCachedClientTokenAsync(CancellationToken cancellationToken)
+    {
+        string? payload;
+        try
+        {
+            payload = await cache.GetStringAsync(ClientCredentialsCacheKey, cancellationToken);
+        }
+        catch
+        {
+            // A cache outage must never block token acquisition — fall through to a live fetch.
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return null;
+        }
+
+        var token = JsonSerializer.Deserialize<OsuOAuthToken>(payload);
+        if (token is null || token.ExpiresAt - DateTimeOffset.UtcNow <= ExpiryGuard)
+        {
+            return null;
+        }
+
+        return token;
+    }
+
+    private async Task CacheClientTokenAsync(OsuOAuthToken token, CancellationToken cancellationToken)
+    {
+        var ttl = token.ExpiresAt - DateTimeOffset.UtcNow - ExpiryGuard;
+        if (ttl <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            await cache.SetStringAsync(
+                ClientCredentialsCacheKey,
+                JsonSerializer.Serialize(token),
+                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl },
+                cancellationToken);
+        }
+        catch
+        {
+            // Best-effort: if the cache write fails we simply fetch again next time.
+        }
     }
 
     private async Task<OsuOAuthToken> ExchangeTokenAsync(

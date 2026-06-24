@@ -186,7 +186,10 @@ public sealed class SynchronizationWorkerIntegrationTests
 
     private sealed class ConfigurableOsuApiClient(IReadOnlyDictionary<long, OsuUserProfile> users) : IOsuApiClient
     {
-        public Task<OsuUserProfile> GetCurrentUserAsync(string accessToken, CancellationToken cancellationToken = default)
+        public Task<OsuUserProfile> GetCurrentUserAsync(
+            string accessToken,
+            bool includeTopScore = true,
+            CancellationToken cancellationToken = default)
         {
             var first = users.Values.FirstOrDefault()
                         ?? throw new InvalidOperationException("No users configured.");

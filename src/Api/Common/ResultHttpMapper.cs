@@ -11,6 +11,7 @@ internal static class ResultHttpMapper
             "VALIDATION_ERROR" => StatusCodes.Status400BadRequest,
             "INVALID_STATE" => StatusCodes.Status400BadRequest,
             "UNAUTHORIZED" => StatusCodes.Status401Unauthorized,
+            "INVALID_REFRESH_TOKEN" => StatusCodes.Status401Unauthorized,
             "FORBIDDEN" => StatusCodes.Status403Forbidden,
             "NOT_FOUND" => StatusCodes.Status404NotFound,
             "CONFLICT" => StatusCodes.Status409Conflict,
