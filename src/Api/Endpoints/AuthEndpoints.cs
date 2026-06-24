@@ -13,9 +13,11 @@ internal static class AuthEndpoints
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         var authGroup = app.MapGroup("/api/v1/auth")
-            .RequireRateLimiting("auth")
             .WithTags("Auth");
 
+        // The OAuth handshake endpoints are the abuse-sensitive surface, so the per-IP "auth"
+        // limiter applies only to them. /me is a JWT-gated session check the SPA polls on
+        // navigation, so it must NOT share the login budget (that was the cause of spurious 429s).
         authGroup.MapGet("/login", async (
             string? returnUrl,
             ISender sender,
@@ -29,7 +31,8 @@ internal static class AuthEndpoints
             }
 
             return Results.Redirect(result.Value.AuthorizationUrl);
-        });
+        })
+        .RequireRateLimiting("auth");
 
         authGroup.MapGet("/callback", async (
             string code,
@@ -74,7 +77,8 @@ internal static class AuthEndpoints
                 expiresAt = callback.ExpiresAt,
                 returnUrl = callback.ReturnUrl
             });
-        });
+        })
+        .RequireRateLimiting("auth");
 
         authGroup.MapGet("/me", async (
             ClaimsPrincipal principal,

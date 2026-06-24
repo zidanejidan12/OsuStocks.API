@@ -53,21 +53,30 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddFixedWindowLimiter("auth", limiter =>
-    {
-        limiter.PermitLimit = 10;
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiter.QueueLimit = 0;
-    });
+    // Partition by client IP so one visitor's traffic can never exhaust the budget for everyone.
+    // A non-partitioned limiter is a single shared bucket across all callers, which lets a handful
+    // of concurrent logins lock out the whole site.
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
 
-    options.AddFixedWindowLimiter("trading", limiter =>
-    {
-        limiter.PermitLimit = 30;
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiter.QueueLimit = 0;
-    });
+    options.AddPolicy("trading", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
 });
 
 builder.Services.AddApplication();
@@ -255,6 +264,27 @@ static void EnsureNotPlaceholder(string key, string? value)
         throw new InvalidOperationException(
             $"Configuration '{key}' must be a non-placeholder value in production.");
     }
+}
+
+// Resolve the real client IP for rate-limit partitioning. In production the API sits behind a
+// single Caddy hop, which *appends* the observed peer to X-Forwarded-For. The rightmost entry is
+// therefore the IP Caddy actually saw; the leftmost is client-supplied and spoofable, so a caller
+// can't vary it to dodge the limiter. Falls back to the socket address for direct/local calls.
+// A stable non-empty key is always returned so anonymous callers are still grouped per-IP rather
+// than collapsed into one shared partition.
+static string GetClientIp(HttpContext httpContext)
+{
+    var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    {
+        var parts = forwardedFor.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length > 0)
+        {
+            return parts[^1];
+        }
+    }
+
+    return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
 
 public partial class Program
