@@ -121,7 +121,8 @@ public sealed class MarketEndpointsTests
         using var scope = factory.Services.CreateScope();
         var marketRepository = scope.ServiceProvider.GetRequiredService<InMemoryMarketReadRepository>();
 
-        var stock = new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 875m, 250, 3.4m, null, null, null);
+        const string coverUrl = "https://assets.ppy.sh/user-profile-covers/123/abc.png";
+        var stock = new MarketStockDetailsReadModel(Guid.NewGuid(), "forum", null, null, 875m, 250, 3.4m, null, null, coverUrl);
         marketRepository.UpsertStock(stock);
 
         var response = await client.GetAsync($"/api/v1/market/stocks/{stock.StockId}");
@@ -132,6 +133,9 @@ public sealed class MarketEndpointsTests
         Assert.Equal(stock.StockId, payload.StockId);
         Assert.Equal("forum", payload.PlayerName);
         Assert.Equal(875m, payload.CurrentPrice);
+        // Regression guard: the endpoint must project the profile cover through as bannerUrl
+        // (it was previously dropped from the anonymous response object).
+        Assert.Equal(coverUrl, payload.BannerUrl);
     }
 
     [Fact]
@@ -201,7 +205,8 @@ public sealed class MarketEndpointsTests
         [property: JsonPropertyName("playerName")] string PlayerName,
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,
         [property: JsonPropertyName("volume")] long Volume,
-        [property: JsonPropertyName("priceChange24h")] decimal PriceChange24h);
+        [property: JsonPropertyName("priceChange24h")] decimal PriceChange24h,
+        [property: JsonPropertyName("bannerUrl")] string? BannerUrl);
 
     private sealed record MarketStockHistoryPointResponse(
         [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp,

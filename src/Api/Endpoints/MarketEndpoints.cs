@@ -160,7 +160,8 @@ internal static class MarketEndpoints
                 volume = result.Value.Volume,
                 priceChange24h = result.Value.PriceChange24h,
                 globalRank = result.Value.GlobalRank,
-                currentPp = result.Value.CurrentPp
+                currentPp = result.Value.CurrentPp,
+                bannerUrl = result.Value.BannerUrl
             });
         });
 
