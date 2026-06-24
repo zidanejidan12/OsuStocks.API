@@ -53,6 +53,22 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+    // Global per-IP backstop across EVERY endpoint. The named "auth"/"trading" policies below are
+    // stricter and stack on top of this for their endpoints; this catches everything else (market
+    // data, leaderboard, portfolio, etc.) that would otherwise be unthrottled. 300/min ≈ 5 req/s
+    // per IP — generous for a real SPA session, but stops a single host from hammering the box.
+    // It does NOT stop a distributed botnet (that needs an edge layer like Cloudflare).
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetClientIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 300,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
     // Partition by client IP so one visitor's traffic can never exhaust the budget for everyone.
     // A non-partitioned limiter is a single shared bucket across all callers, which lets a handful
     // of concurrent logins lock out the whole site.
@@ -195,8 +211,10 @@ var healthCheckOptions = new HealthCheckOptions
     }
 };
 
-app.MapHealthChecks("/health", healthCheckOptions);
-app.MapHealthChecks("/api/v1/health", healthCheckOptions);
+// Health checks are polled by the Docker healthcheck + external uptime monitors; exempt them from
+// the global rate limiter so probes can't be throttled (and a 429 misreported as "down").
+app.MapHealthChecks("/health", healthCheckOptions).DisableRateLimiting();
+app.MapHealthChecks("/api/v1/health", healthCheckOptions).DisableRateLimiting();
 
 // Feature endpoints live in src/Api/Endpoints/*Endpoints.cs as MapXEndpoints() extension methods.
 app.MapAuthEndpoints();
