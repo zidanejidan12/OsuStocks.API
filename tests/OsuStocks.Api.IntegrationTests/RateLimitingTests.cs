@@ -25,8 +25,8 @@ public sealed class RateLimitingTests : IAsyncLifetime
     [Fact]
     public async Task AuthEndpoints_ExceedingRateLimit_Returns429()
     {
-        // Auth rate limit: 10 requests per minute
-        var tasks = Enumerable.Range(0, 15)
+        // Auth rate limit: 20 requests per minute, partitioned per client IP.
+        var tasks = Enumerable.Range(0, 30)
             .Select(_ => _client.GetAsync("/api/v1/auth/login?returnUrl=https://app.osustocks.example"))
             .ToList();
 
@@ -35,7 +35,7 @@ public sealed class RateLimitingTests : IAsyncLifetime
         var okCount = responses.Count(r => r.StatusCode != HttpStatusCode.TooManyRequests);
         var rateLimitedCount = responses.Count(r => r.StatusCode == HttpStatusCode.TooManyRequests);
 
-        Assert.True(okCount <= 10, $"Expected at most 10 non-429 responses but got {okCount}");
+        Assert.True(okCount <= 20, $"Expected at most 20 non-429 responses but got {okCount}");
         Assert.True(rateLimitedCount > 0, "Expected at least one 429 response");
     }
 
