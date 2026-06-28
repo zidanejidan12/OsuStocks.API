@@ -164,6 +164,18 @@ internal static class AdminEndpoints
                 new { jobId, count = requested, status = "queued" });
         });
 
+        // Manually run the inactivity-decay evaluation (normally a daily recurring job). Handy after
+        // changing the decay multiplier so the effect can be observed immediately rather than waiting
+        // for the next daily run. Enqueued on the worker (DisableConcurrentExecution guards overlap).
+        adminGroup.MapPost("/jobs/inactivity-decay", (IBackgroundJobClient backgroundJobs) =>
+        {
+            var jobId = backgroundJobs.Enqueue<InactivityDecayRecurringJob>(job => job.RunAsync());
+
+            return Results.Accepted(
+                "/api/v1/admin/market-settings",
+                new { jobId, job = "inactivity-decay", status = "queued" });
+        });
+
         trackedPlayersGroup.MapPatch("/{id:guid}/enable", async (
             Guid id,
             ClaimsPrincipal principal,
