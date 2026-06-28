@@ -14,7 +14,7 @@ namespace OsuStocks.Api.IntegrationTests;
 public sealed class InactivityDecayHandlerIntegrationTests
 {
     [Fact]
-    public async Task Handle_PlayersInactiveForMoreThanThreshold_PublishesDecayEvents()
+    public async Task Handle_PlayersWithNoPpGainOverWindow_PublishesDecayEvents()
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -22,22 +22,32 @@ public sealed class InactivityDecayHandlerIntegrationTests
         var snapshotRepository = new InMemoryPlayerSnapshotRepositoryBatch();
         var publisher = new CapturingPublisher();
 
-        var activeRecent = CreateTrackedPlayer(1001, "recent-player");
-        var activeStale = CreateTrackedPlayer(1002, "stale-player");
-        var activeVeryStale = CreateTrackedPlayer(1003, "very-stale-player");
+        // Every player has a FRESH latest snapshot (like prod, where sync writes one each cycle),
+        // so recency alone never signals inactivity — only pp movement over the window does.
+        var gainedPp = CreateTrackedPlayer(1001, "gained-pp");
+        var flatPp = CreateTrackedPlayer(1002, "flat-pp");
+        var declinedPp = CreateTrackedPlayer(1003, "declined-pp");
+        var newPlayer = CreateTrackedPlayer(1004, "new-player");
 
-        await trackedPlayerRepository.AddAsync(activeRecent);
-        await trackedPlayerRepository.AddAsync(activeStale);
-        await trackedPlayerRepository.AddAsync(activeVeryStale);
+        await trackedPlayerRepository.AddAsync(gainedPp);
+        await trackedPlayerRepository.AddAsync(flatPp);
+        await trackedPlayerRepository.AddAsync(declinedPp);
+        await trackedPlayerRepository.AddAsync(newPlayer);
 
-        // Recent snapshot (2 days ago) — should NOT decay
-        await snapshotRepository.AddAsync(CreateSnapshot(activeRecent.Id, now.AddDays(-2)));
+        // Gained pp over the 7d window (5000 -> 5300) — active, should NOT decay.
+        await snapshotRepository.AddAsync(CreateSnapshot(gainedPp.Id, now.AddDays(-8), pp: 5000m));
+        await snapshotRepository.AddAsync(CreateSnapshot(gainedPp.Id, now.AddHours(-1), pp: 5300m));
 
-        // Stale snapshot (8 days ago) — should decay (threshold = 7)
-        await snapshotRepository.AddAsync(CreateSnapshot(activeStale.Id, now.AddDays(-8)));
+        // Flat pp across the window — should decay.
+        await snapshotRepository.AddAsync(CreateSnapshot(flatPp.Id, now.AddDays(-8), pp: 5000m));
+        await snapshotRepository.AddAsync(CreateSnapshot(flatPp.Id, now.AddHours(-1), pp: 5000m));
 
-        // Very stale snapshot (30 days ago) — should decay
-        await snapshotRepository.AddAsync(CreateSnapshot(activeVeryStale.Id, now.AddDays(-30)));
+        // pp declined (osu! recalc) — still no gain, should decay.
+        await snapshotRepository.AddAsync(CreateSnapshot(declinedPp.Id, now.AddDays(-10), pp: 5000m));
+        await snapshotRepository.AddAsync(CreateSnapshot(declinedPp.Id, now.AddHours(-1), pp: 4900m));
+
+        // Tracked for less than the window (no baseline at/before the cutoff) — cannot judge, skip.
+        await snapshotRepository.AddAsync(CreateSnapshot(newPlayer.Id, now.AddDays(-2), pp: 5000m));
 
         var handler = new EvaluateInactivityDecayCommandHandler(
             trackedPlayerRepository,
@@ -49,7 +59,7 @@ public sealed class InactivityDecayHandlerIntegrationTests
         var result = await handler.Handle(new EvaluateInactivityDecayCommand(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(3, result.Value!.PlayersEvaluated);
+        Assert.Equal(4, result.Value!.PlayersEvaluated);
         Assert.Equal(2, result.Value.DecayEventsPublished);
         Assert.Equal(2, publisher.PlayerInactiveNotifications.Count);
 
@@ -57,9 +67,10 @@ public sealed class InactivityDecayHandlerIntegrationTests
             .Select(n => n.Event.TrackedPlayerId)
             .ToList();
 
-        Assert.Contains(activeStale.Id, decayedPlayerIds);
-        Assert.Contains(activeVeryStale.Id, decayedPlayerIds);
-        Assert.DoesNotContain(activeRecent.Id, decayedPlayerIds);
+        Assert.Contains(flatPp.Id, decayedPlayerIds);
+        Assert.Contains(declinedPp.Id, decayedPlayerIds);
+        Assert.DoesNotContain(gainedPp.Id, decayedPlayerIds);
+        Assert.DoesNotContain(newPlayer.Id, decayedPlayerIds);
     }
 
     [Fact]
@@ -119,10 +130,11 @@ public sealed class InactivityDecayHandlerIntegrationTests
         var player = CreateTrackedPlayer(1001, "threshold-test");
         await trackedPlayerRepository.AddAsync(player);
 
-        // Snapshot 4 days ago
-        await snapshotRepository.AddAsync(CreateSnapshot(player.Id, now.AddDays(-4)));
+        // Fresh latest snapshot, but pp has been flat since 4 days ago.
+        await snapshotRepository.AddAsync(CreateSnapshot(player.Id, now.AddDays(-4), pp: 5000m));
+        await snapshotRepository.AddAsync(CreateSnapshot(player.Id, now.AddHours(-1), pp: 5000m));
 
-        // With threshold = 3 days, this player should decay
+        // threshold = 3: a baseline exists at/before now-3d (the -4d snapshot) and pp is flat → decay
         var handler = new EvaluateInactivityDecayCommandHandler(
             trackedPlayerRepository,
             snapshotRepository,
@@ -163,13 +175,13 @@ public sealed class InactivityDecayHandlerIntegrationTests
         };
     }
 
-    private static PlayerSnapshot CreateSnapshot(Guid trackedPlayerId, DateTimeOffset capturedAt)
+    private static PlayerSnapshot CreateSnapshot(Guid trackedPlayerId, DateTimeOffset capturedAt, decimal pp = 5000m)
     {
         return new PlayerSnapshot
         {
             Id = Guid.NewGuid(),
             TrackedPlayerId = trackedPlayerId,
-            CurrentPp = 5000m,
+            CurrentPp = pp,
             GlobalRank = 1000,
             TopScoreId = 1,
             TopScorePp = 500m,
@@ -211,6 +223,31 @@ public sealed class InactivityDecayHandlerIntegrationTests
                 if (_snapshotsByPlayerId.TryGetValue(id, out var list) && list.Count > 0)
                 {
                     result[id] = list.OrderByDescending(x => x.CapturedAt).First();
+                }
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<Guid, PlayerSnapshot>>(result);
+        }
+
+        public Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestAtOrBeforeByTrackedPlayerIdsAsync(
+            IReadOnlyCollection<Guid> trackedPlayerIds,
+            DateTimeOffset cutoff,
+            CancellationToken cancellationToken = default)
+        {
+            var result = new Dictionary<Guid, PlayerSnapshot>();
+
+            foreach (var id in trackedPlayerIds)
+            {
+                if (_snapshotsByPlayerId.TryGetValue(id, out var list))
+                {
+                    var snapshot = list
+                        .Where(x => x.CapturedAt <= cutoff)
+                        .OrderByDescending(x => x.CapturedAt)
+                        .FirstOrDefault();
+                    if (snapshot is not null)
+                    {
+                        result[id] = snapshot;
+                    }
                 }
             }
 
