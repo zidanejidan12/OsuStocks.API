@@ -36,6 +36,21 @@ internal sealed class PlayerSnapshotRepository(AppDbContext dbContext) : IPlayer
         return snapshots;
     }
 
+    public async Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestAtOrBeforeByTrackedPlayerIdsAsync(
+        IReadOnlyCollection<Guid> trackedPlayerIds,
+        DateTimeOffset cutoff,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshots = await dbContext.PlayerSnapshots
+            .AsNoTracking()
+            .Where(x => trackedPlayerIds.Contains(x.TrackedPlayerId) && x.CapturedAt <= cutoff)
+            .GroupBy(x => x.TrackedPlayerId)
+            .Select(g => g.OrderByDescending(x => x.CapturedAt).First())
+            .ToDictionaryAsync(x => x.TrackedPlayerId, cancellationToken);
+
+        return snapshots;
+    }
+
     public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
     {
         // Set-based delete (no entity loading). Only the latest snapshot per player matters for sync,

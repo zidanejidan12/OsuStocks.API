@@ -304,6 +304,31 @@ public sealed class SynchronizationWorkerIntegrationTests
             return Task.FromResult<IReadOnlyDictionary<Guid, PlayerSnapshot>>(result);
         }
 
+        public Task<IReadOnlyDictionary<Guid, PlayerSnapshot>> GetLatestAtOrBeforeByTrackedPlayerIdsAsync(
+            IReadOnlyCollection<Guid> trackedPlayerIds,
+            DateTimeOffset cutoff,
+            CancellationToken cancellationToken = default)
+        {
+            var result = new Dictionary<Guid, PlayerSnapshot>();
+
+            foreach (var id in trackedPlayerIds)
+            {
+                if (_snapshotsByTrackedPlayerId.TryGetValue(id, out var list))
+                {
+                    var snapshot = list
+                        .Where(x => x.CapturedAt <= cutoff)
+                        .OrderByDescending(x => x.CapturedAt)
+                        .FirstOrDefault();
+                    if (snapshot is not null)
+                    {
+                        result[id] = Clone(snapshot);
+                    }
+                }
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<Guid, PlayerSnapshot>>(result);
+        }
+
         public Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
         {
             var removed = 0;
