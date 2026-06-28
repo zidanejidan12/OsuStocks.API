@@ -67,13 +67,13 @@ public sealed class OAuthCallbackEndpointsTests
         Assert.Equal(1, walletRepository.Count);
         // New users get the 100k initial grant plus the auto-granted day-1 daily-login reward
         // (default schedule day 1 = 5,000), since logging in is their first login of the day.
-        Assert.Equal(105_000m, wallet.Balance);
+        Assert.Equal(101_500m, wallet.Balance);
 
         var transactions = await walletTransactionRepository.GetByWalletIdAsync(wallet.Id, 0, 10);
 
         Assert.Equal(2, transactions.Count);
         Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.InitialGrant && t.Amount == 100_000m);
-        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.DailyReward && t.Amount == 5_000m);
+        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.DailyReward && t.Amount == 1_500m);
 
         // The daily-login cache on the user reflects the auto-grant.
         Assert.Equal(1, user.DailyRewardStreak);
@@ -207,10 +207,10 @@ public sealed class OAuthCallbackEndpointsTests
 
         var wallet = await walletRepository.GetByUserIdAsync(existingUserId);
         Assert.NotNull(wallet);
-        Assert.Equal(105_000m, wallet!.Balance);
+        Assert.Equal(101_500m, wallet!.Balance);
 
         var transactions = await walletTransactionRepository.GetByWalletIdAsync(wallet.Id, 0, 10);
-        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.DailyReward && t.Amount == 5_000m);
+        Assert.Contains(transactions, t => t.TransactionType == WalletTransactionType.DailyReward && t.Amount == 1_500m);
 
         Assert.Equal(1, ledgerRepository.Count);
     }

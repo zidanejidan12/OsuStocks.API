@@ -103,8 +103,8 @@ public sealed class AchievementsAndMissionsEndpointsTests(PostgresTestcontainerF
                 .Where(t => t.Wallet.UserId == TestUserId
                     && t.TransactionType == WalletTransactionType.AchievementReward)
                 .ToListAsync();
-            Assert.Contains(rewardLedger, t => t.Amount == 1_000m);  // first-trade
-            Assert.Contains(rewardLedger, t => t.Amount == 5_000m);  // volume-100k
+            Assert.Contains(rewardLedger, t => t.Amount == 300m);    // first-trade
+            Assert.Contains(rewardLedger, t => t.Amount == 1_500m);  // volume-100k
 
             var notifications = await db.Notifications.AsNoTracking()
                 .Where(n => n.UserId == TestUserId && n.Type == "AchievementUnlocked")
@@ -117,7 +117,7 @@ public sealed class AchievementsAndMissionsEndpointsTests(PostgresTestcontainerF
             using var payload = JsonDocument.Parse(firstTrade.Data!);
             Assert.Equal("first-trade", payload.RootElement.GetProperty("code").GetString());
             Assert.Equal("First Steps", payload.RootElement.GetProperty("name").GetString());
-            Assert.Equal(1000, payload.RootElement.GetProperty("rewardCredits").GetInt64());
+            Assert.Equal(300, payload.RootElement.GetProperty("rewardCredits").GetInt64());
         }
 
         // A second trade on a different stock must not re-unlock first-trade (idempotent).
@@ -155,12 +155,12 @@ public sealed class AchievementsAndMissionsEndpointsTests(PostgresTestcontainerF
             var completions = await db.UserMissionCompletions.AsNoTracking()
                 .Where(x => x.UserId == TestUserId && x.MissionCode == "daily-trade-3").ToListAsync();
             var completion = Assert.Single(completions);
-            Assert.Equal(3_000L, completion.RewardCredits);
+            Assert.Equal(1_000L, completion.RewardCredits);
 
             var reward = await db.WalletTransactions.AsNoTracking()
                 .Where(t => t.Wallet.UserId == TestUserId && t.TransactionType == WalletTransactionType.MissionReward)
                 .ToListAsync();
-            Assert.Contains(reward, t => t.Amount == 3_000m);
+            Assert.Contains(reward, t => t.Amount == 1_000m);
             initialMissionRewardCount = reward.Count;
 
             var notified = await db.Notifications.AsNoTracking()

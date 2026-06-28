@@ -33,10 +33,10 @@ public sealed class DailyLoginEndpointsTests
         Assert.NotNull(payload);
         Assert.Equal(1, payload.Streak);
         Assert.False(payload.ClaimedToday);
-        Assert.Equal(5000m, payload.TodayAmount);
+        Assert.Equal(1500m, payload.TodayAmount);
         Assert.Equal(7, payload.Schedule.Count);
-        Assert.Equal(5000m, payload.Schedule[0]);
-        Assert.Equal(30000m, payload.Schedule[6]);
+        Assert.Equal(1500m, payload.Schedule[0]);
+        Assert.Equal(10000m, payload.Schedule[6]);
         Assert.True(payload.NextResetUtc > payload.ServerTimeUtc);
     }
 
@@ -69,9 +69,9 @@ public sealed class DailyLoginEndpointsTests
 
         Assert.True(payload.Granted);
         Assert.False(payload.AlreadyClaimed);
-        Assert.Equal(5000m, payload.Amount);
+        Assert.Equal(1500m, payload.Amount);
         Assert.Equal(1, payload.StreakDay);
-        Assert.Equal(6000m, payload.NewBalance);
+        Assert.Equal(2500m, payload.NewBalance);
 
         // The ledger row is the authoritative idempotency record — verify it was actually persisted.
         using var scope = factory.Services.CreateScope();
@@ -79,7 +79,7 @@ public sealed class DailyLoginEndpointsTests
         var reward = await ledger.GetByUserAndDateAsync(TestUserId, Today, CancellationToken.None);
         Assert.NotNull(reward);
         Assert.Equal(1, reward!.StreakDay);
-        Assert.Equal(5000m, reward.Amount);
+        Assert.Equal(1500m, reward.Amount);
         Assert.Equal(1, ledger.Count);
     }
 
@@ -96,13 +96,13 @@ public sealed class DailyLoginEndpointsTests
         var second = await ClaimAsync(client);
         Assert.False(second.Granted);
         Assert.True(second.AlreadyClaimed);
-        Assert.Equal(5000m, second.Amount);
+        Assert.Equal(1500m, second.Amount);
         Assert.Equal(1, second.StreakDay);
 
         using var scope = factory.Services.CreateScope();
         var wallets = scope.ServiceProvider.GetRequiredService<InMemoryWalletRepository>();
         var wallet = await wallets.GetByUserIdAsync(TestUserId);
-        Assert.Equal(6000m, wallet!.Balance);
+        Assert.Equal(2500m, wallet!.Balance);
 
         // Exactly one ledger row despite two claims.
         var ledger = scope.ServiceProvider.GetRequiredService<InMemoryDailyLoginRewardRepository>();
@@ -125,7 +125,7 @@ public sealed class DailyLoginEndpointsTests
         Assert.NotNull(payload);
         Assert.True(payload.ClaimedToday);
         Assert.Equal(1, payload.Streak);
-        Assert.Equal(5000m, payload.TodayAmount);
+        Assert.Equal(1500m, payload.TodayAmount);
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public sealed class DailyLoginEndpointsTests
         Assert.False(payload.ClaimedToday);
         // streak and todayAmount must describe the SAME day: claiming now grants day 4.
         Assert.Equal(4, payload.Streak);
-        Assert.Equal(12500m, payload.TodayAmount);
+        Assert.Equal(4500m, payload.TodayAmount);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public sealed class DailyLoginEndpointsTests
         Assert.False(payload.ClaimedToday);
         // After the final day the cycle wraps: streak and amount both report day 1, not a stale 7 / day-1 mix.
         Assert.Equal(1, payload.Streak);
-        Assert.Equal(5000m, payload.TodayAmount);
+        Assert.Equal(1500m, payload.TodayAmount);
     }
 
     [Fact]
@@ -178,8 +178,8 @@ public sealed class DailyLoginEndpointsTests
 
         Assert.True(payload.Granted);
         Assert.Equal(4, payload.StreakDay);
-        Assert.Equal(12500m, payload.Amount);   // default schedule day 4
-        Assert.Equal(13500m, payload.NewBalance);
+        Assert.Equal(4500m, payload.Amount);   // default schedule day 4
+        Assert.Equal(5500m, payload.NewBalance);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public sealed class DailyLoginEndpointsTests
 
         Assert.True(payload.Granted);
         Assert.Equal(1, payload.StreakDay);
-        Assert.Equal(5000m, payload.Amount);
+        Assert.Equal(1500m, payload.Amount);
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public sealed class DailyLoginEndpointsTests
 
         Assert.True(payload.Granted);
         Assert.Equal(1, payload.StreakDay);
-        Assert.Equal(5000m, payload.Amount);
+        Assert.Equal(1500m, payload.Amount);
     }
 
     [Fact]
