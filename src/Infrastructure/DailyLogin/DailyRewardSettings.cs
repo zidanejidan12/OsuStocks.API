@@ -5,10 +5,11 @@ namespace OsuStocks.Infrastructure.DailyLogin;
 
 internal sealed class DailyRewardSettings : IDailyRewardSettings
 {
-    // Built-in 7-day schedule (a full week totals ~100,000 — one starting wallet). Overridable via the
+    // Built-in 7-day schedule (a full week totals ~34,500 — about a third of a starting wallet, so the
+    // daily login is a small floor, not a comeback fund: "if you lose, you lose"). Overridable via the
     // "DailyReward:DailyAmounts" configuration section.
     private static readonly IReadOnlyList<decimal> DefaultAmounts =
-        new[] { 5000m, 7500m, 10000m, 12500m, 15000m, 20000m, 30000m };
+        new[] { 1500m, 2500m, 3500m, 4500m, 5500m, 7000m, 10000m };
 
     public DailyRewardSettings(IOptions<DailyRewardOptions> options)
     {

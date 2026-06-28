@@ -33,8 +33,8 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
         Assert.True(payload.Granted);
         Assert.False(payload.AlreadyClaimed);
         Assert.Equal(1, payload.StreakDay);
-        Assert.Equal(5000m, payload.Amount);
-        Assert.Equal(6000m, payload.NewBalance);
+        Assert.Equal(1500m, payload.Amount);
+        Assert.Equal(2500m, payload.NewBalance);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -42,18 +42,18 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
         var rewards = await dbContext.DailyLoginRewards.Where(x => x.UserId == TestUserId).ToListAsync();
         var reward = Assert.Single(rewards);
         Assert.Equal(1, reward.StreakDay);
-        Assert.Equal(5000m, reward.Amount);
+        Assert.Equal(1500m, reward.Amount);
         Assert.Equal(DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime), reward.RewardDate);
 
         var wallet = await dbContext.Wallets.AsNoTracking().FirstAsync(x => x.UserId == TestUserId);
-        Assert.Equal(6000m, wallet.Balance);
+        Assert.Equal(2500m, wallet.Balance);
 
         var txns = await dbContext.WalletTransactions
             .AsNoTracking()
             .Where(x => x.WalletId == wallet.Id && x.TransactionType == WalletTransactionType.DailyReward)
             .ToListAsync();
         var txn = Assert.Single(txns);
-        Assert.Equal(5000m, txn.Amount);
+        Assert.Equal(1500m, txn.Amount);
         Assert.Equal(reward.Id, txn.ReferenceId);
 
         // The denormalized cache on the user matches the ledger.
@@ -83,7 +83,7 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
         Assert.Equal(1, rewardCount);
 
         var wallet = await dbContext.Wallets.AsNoTracking().FirstAsync(x => x.UserId == TestUserId);
-        Assert.Equal(6000m, wallet.Balance);
+        Assert.Equal(2500m, wallet.Balance);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
 
         Assert.True(payload.Granted);
         Assert.Equal(4, payload.StreakDay);
-        Assert.Equal(12500m, payload.Amount);
+        Assert.Equal(4500m, payload.Amount);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
 
         Assert.True(payload.Granted);
         Assert.Equal(1, payload.StreakDay);
-        Assert.Equal(5000m, payload.Amount);
+        Assert.Equal(1500m, payload.Amount);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
 
         Assert.True(payload.Granted);
         Assert.Equal(1, payload.StreakDay);
-        Assert.Equal(5000m, payload.Amount);
+        Assert.Equal(1500m, payload.Amount);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
         var payload = await response.Content.ReadFromJsonAsync<StatusResponse>();
         Assert.NotNull(payload);
         Assert.False(payload!.ClaimedToday);
-        Assert.Equal(5000m, payload.TodayAmount);
+        Assert.Equal(1500m, payload.TodayAmount);
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -177,7 +177,7 @@ public sealed class DailyLoginPostgresTests(PostgresTestcontainerFixture fixture
         // The authoritative invariant: exactly one ledger row and the wallet credited exactly once.
         Assert.Equal(1, await dbContext.DailyLoginRewards.CountAsync(x => x.UserId == TestUserId));
         var wallet = await dbContext.Wallets.AsNoTracking().FirstAsync(x => x.UserId == TestUserId);
-        Assert.Equal(6000m, wallet.Balance);
+        Assert.Equal(2500m, wallet.Balance);
     }
 
     private static async Task<ClaimResponse> ClaimAsync(HttpClient client)
